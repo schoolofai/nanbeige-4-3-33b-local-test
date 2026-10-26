@@ -1,0 +1,14 @@
+const puppeteer=require('puppeteer-core');
+const path=require('path');const f=process.argv[2];const tag=process.argv[3];
+(async()=>{const b=await puppeteer.launch({executablePath:process.env.CHROME||'/usr/bin/google-chrome',headless:true,args:['--no-sandbox','--allow-file-access-from-files']});
+const p=await b.newPage();const errs=[];p.on('pageerror',e=>errs.push(String(e)));p.on('console',m=>{if(m.type()==='error')errs.push(m.text())});
+const reqs=[];p.on('request',r=>{if(!r.url().startsWith('file:'))reqs.push(r.url())});
+await p.setViewport({width:900,height:900});await p.goto('file://'+path.resolve(f));
+const sl=ms=>new Promise(r=>setTimeout(r,ms));
+await sl(600);await p.screenshot({path:`./${tag}_0start.png`});
+await p.keyboard.press('ArrowDown');await sl(700);await p.keyboard.press('ArrowRight');await sl(700);
+await p.screenshot({path:`./${tag}_1moving.png`});
+await sl(6000);await p.screenshot({path:`./${tag}_2later.png`});
+await p.keyboard.press('Space');await sl(800);await p.screenshot({path:`./${tag}_3restart.png`});
+const canvas=await p.$$eval('canvas',c=>c.map(x=>[x.width,x.height]));
+console.log(JSON.stringify({tag,errors:errs,external_requests:reqs,canvas}));await b.close();})();

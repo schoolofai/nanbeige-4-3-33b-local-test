@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Snake</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #1b1f24;
+    color: #e6edf3;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+  h1 {
+    margin: 0;
+    font-size: 28px;
+    letter-spacing: 2px;
+  }
+  #hud {
+    display: flex;
+    gap: 24px;
+    font-size: 18px;
+  }
+  #hud span b { color: #7ee787; }
+  canvas {
+    background: #0d1117;
+    border: 2px solid #30363d;
+    border-radius: 6px;
+    image-rendering: pixelated;
+  }
+  #help {
+    font-size: 14px;
+    color: #8b949e;
+  }
+</style>
+</head>
+<body>
+  <h1>SNAKE</h1>
+  <div id="hud">
+    <span>Score: <b id="score">0</b></span>
+    <span>Best: <b id="best">0</b></span>
+    <span>Level: <b id="level">1</b></span>
+  </div>
+  <canvas id="game" width="400" height="400"></canvas>
+  <div id="help">Arrow keys / WASD to steer &middot; Space to restart</div>
+
+<script>
+(function () {
+  const GRID = 20;
+  const CELL = 20;
+  const BASE_DELAY = 150;   // ms per tick at the start
+  const SPEED_STEP = 10;    // ms faster every 5 points
+  const MIN_DELAY = 50;
+
+  const canvas = document.getElementById("game");
+  const ctx = canvas.getContext("2d");
+  const scoreEl = document.getElementById("score");
+  const bestEl = document.getElementById("best");
+  const levelEl = document.getElementById("level");
+
+  canvas.width = GRID * CELL;
+  canvas.height = GRID * CELL;
+
+  let snake, dir, dirQueue, food, score, best = 0, state, timer;
+
+  const DIRS = {
+    ArrowUp: { x: 0, y: -1 }, KeyW: { x: 0, y: -1 },
+    ArrowDown: { x: 0, y: 1 }, KeyS: { x: 0, y: 1 },
+    ArrowLeft: { x: -1, y: 0 }, KeyA: { x: -1, y: 0 },
+    ArrowRight: { x: 1, y: 0 }, KeyD: { x: 1, y: 0 }
+  };
+
+  function reset() {
+    clearTimeout(timer);
+    const mid = Math.floor(GRID / 2);
+    snake = [
+      { x: mid, y: mid },
+      { x: mid - 1, y: mid },
+      { x: mid - 2, y: mid }
+    ];
+    dir = { x: 1, y: 0 };
+    dirQueue = [];
+    score = 0;
+    state = "ready"; // ready | playing | over | won
+    placeFood();
+    updateHud();
+    draw();
+  }
+
+  function currentDelay() {
+    return Math.max(MIN_DELAY, BASE_DELAY - Math.floor(score / 5) * SPEED_STEP);
+  }
+
+  function placeFood() {
+    const free = [];
+    for (let y = 0; y < GRID; y++) {
+      for (let x = 0; x < GRID; x++) {
+        if (!snake.some(s => s.x === x && s.y === y)) free.push({ x, y });
+      }
+    }
+    food = free.length ? free[Math.floor(Math.random() * free.length)] : null;
+  }
+
+  function updateHud() {
+    scoreEl.textContent = score;
+    bestEl.textContent = best;
+    levelEl.textContent = Math.floor(score / 5) + 1;
+  }
+
+  function start() {
+    state = "playing";
+    schedule();
+  }
+
+  function schedule() {
+    clearTimeout(timer);
+    timer = setTimeout(tick, currentDelay());
+  }
+
+  function tick() {
+    if (state !== "playing") return;
+
+    if (dirQueue.length) dir = dirQueue.shift();
+
+    const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+
+    // Wall collision
+    if (head.x < 0 || head.y < 0 || head.x >= GRID || head.y >= GRID) {
+      return gameOver();
+    }
+
+    const eating = food && head.x === food.x && head.y === food.y;
+
+    // Self collision (tail moves away unless we're eating)
+    const body = eating ? snake : snake.slice(0, -1);
+    if (body.some(s => s.x === head.x && s.y === head.y)) {
+      return gameOver();
+    }
+
+    snake.unshift(head);
+    if (eating) {
+      score++;
+      if (score > best) best = score;
+      updateHud();
+      placeFood();
+      if (!food) {
+        state = "won";
+        draw();
+        return;
+      }
+    } else {
+      snake.pop();
+    }
+
+    draw();
+    schedule();
+  }
+
+  function gameOver() {
+    state = "over";
+    clearTimeout(timer);
+    draw();
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function draw() {
+    // Background with subtle checkerboard
+    for (let y = 0; y < GRID; y++) {
+      for (let x = 0; x < GRID; x++) {
+        ctx.fillStyle = (x + y) % 2 === 0 ? "#0d1117" : "#111821";
+        ctx.fillRect(x * CELL, y * CELL, CELL, CELL);
+      }
+    }
+
+    // Food
+    if (food) {
+      ctx.fillStyle = "#ff5c5c";
+      ctx.beginPath();
+      ctx.arc(food.x * CELL + CELL / 2, food.y * CELL + CELL / 2, CELL / 2 - 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Snake
+    snake.forEach((s, i) => {
+      ctx.fillStyle = i === 0 ? "#7ee787" : "#3fb950";
+      roundRect(s.x * CELL + 1, s.y * CELL + 1, CELL - 2, CELL - 2, 4);
+      ctx.fill();
+    });
+
+    // Eyes on head
+    const h = snake[0];
+    ctx.fillStyle = "#0d1117";
+    const cx = h.x * CELL + CELL / 2, cy = h.y * CELL + CELL / 2;
+    const px = -dir.y, py = dir.x; // perpendicular
+    [-1, 1].forEach(side => {
+      ctx.beginPath();
+      ctx.arc(cx + dir.x * 4 + px * 4 * side, cy + dir.y * 4 + py * 4 * side, 2, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Score on canvas
+    ctx.fillStyle = "rgba(230,237,243,0.85)";
+    ctx.font = "bold 16px system-ui, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText("Score: " + score, 8, 6);
+
+    // Overlays
+    if (state === "ready") {
+      overlay("SNAKE", "Press an arrow key / WASD to start");
+    } else if (state === "over") {
+      overlay("GAME OVER", "Score: " + score + "  \u00b7  Press Space to restart");
+    } else if (state === "won") {
+      overlay("YOU WIN!", "Press Space to play again");
+    }
+  }
+
+  function overlay(title, sub) {
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#e6edf3";
+    ctx.font = "bold 36px system-ui, sans-serif";
+    ctx.fillText(title, canvas.width / 2, canvas.height / 2 - 18);
+    ctx.font = "15px system-ui, sans-serif";
+    ctx.fillStyle = "#c9d1d9";
+    ctx.fillText(sub, canvas.width / 2, canvas.height / 2 + 20);
+  }
+
+  document.addEventListener("keydown", e => {
+    if (e.code === "Space") {
+      e.preventDefault();
+      reset();
+      return;
+    }
+
+    const nd = DIRS[e.code];
+    if (!nd) return;
+    e.preventDefault();
+
+    if (state === "over" || state === "won") return;
+
+    // Compare against the last queued direction to block 180° turns
+    const last = dirQueue.length ? dirQueue[dirQueue.length - 1] : dir;
+    if (nd.x === -last.x && nd.y === -last.y) return;
+    if (nd.x === last.x && nd.y === last.y) {
+      if (state === "ready") start();
+      return;
+    }
+    if (dirQueue.length < 3) dirQueue.push(nd);
+
+    if (state === "ready") start();
+  });
+
+  reset();
+})();
+</script>
+</body>
+</html>
