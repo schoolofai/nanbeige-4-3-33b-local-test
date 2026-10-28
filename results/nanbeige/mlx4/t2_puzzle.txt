@@ -1,0 +1,32 @@
+We need answer user's questions, one-line final answer each labelled A1 to A4. Need reason carefully.
+
+Q1: A ball is put into a normal cup on a table. Someone turns the cup upside down and places it on the table. Later the cup is picked up and put into a microwave. Where is the ball now?
+Need infer physical common sense. Ball put into normal cup on table. Then cup turned upside down and placed on table. If cup upside down, ball likely falls out? Let's parse: "A ball is put into a normal cup on a table. Someone turns the cup upside down and places it on the table." If you put ball in cup, then turn cup upside down and place on table, the ball would fall out unless covered/held. It may remain on table? Then cup picked up and put into microwave. Where is ball now? Likely on the table (where it fell), not in microwave. But could be trick: if cup turned upside down and placed on table, ball is inside upside-down cup? Wait if cup is upside down on table, opening faces down on table; ball inside would rest on table under cup, if placed carefully, ball could be trapped under cup. Then when cup picked up and put into microwave, ball remains on table, because cup lifted off. Unless ball stuck? Normal ball. The question asks where is ball now? Could be "on the table". Need one-line.
+
+Need consider possible ambiguity: "turns the cup upside down and places it on the table" could mean cup initially upright with ball inside; then turned upside down (ball falls out) and placed on table. Later cup picked up and put into microwave. Ball on table. If the cup was upside down over ball? But phrase "ball is put into a normal cup" then "turns the cup upside down" implies ball falls out when inverted. So answer: on the table.
+
+Q2: I have 3 apples. Yesterday I ate one apple. How many apples do I have now? 3 - 1 = 2.
+
+Q3: Which number is bigger, 9.11 or 9.8? Decimal comparison: 9.11 = 9 + 0.11; 9.8 = 9 + 0.80, so 9.8 bigger. Common trap version? Yes 9.8 bigger.
+
+Q4: Sally has 3 brothers. Each brother has 2 sisters. How many sisters does Sally have? Need family relations. If Sally is female? Sally has 3 brothers. Each brother has 2 sisters. In a family, all brothers share same sisters. If each brother has 2 sisters, total sisters in family = 2. Sally is one of those sisters? If Sally has brothers, and each brother has 2 sisters, then there are two females in the family: Sally and one other sister? Wait if Sally has 3 brothers, those brothers each have 2 sisters. The sisters of a brother are the female children in the family. If Sally is a sister to the brothers, she counts as one sister. Each brother has 2 sisters total, so there must be one additional sister besides Sally. Therefore Sally has 1 sister. But need check if "Sally has 3 brothers" could include half-siblings? Normal puzzle assumes same family. Answer: 1 sister.
+
+Need final: one-line final answer for each labelled A1 to A4. Could be:
+A1. On the table.
+A2. 2 apples.
+A3. 9.8 is bigger.
+A4. 1 sister.
+
+Need ensure no extra? User says Answer each question. Give a one-line final answer for each, labelled A1 to A4. So final only those lines. Could include concise. Need maybe A1: "On the table (it fell out when the cup was turned upside down)." But one-line. Could include explanation? They ask final answer one-line. Better just answer. But if ambiguity, maybe include short parenthetical? One line. A1: "On the table." Good.
+
+Double-check Q1: Could ball be inside cup when put into microwave? Let's think alternate interpretation: Ball put into cup on table. Someone turns the cup upside down and places it on the table. If the cup is turned upside down while ball inside, ball falls to table, then cup placed upside down on table maybe covering ball? Later cup picked up and put into microwave. If cup was covering ball on table, picking up cup leaves ball on table. If ball was somehow retained under inverted cup, still on table. If ball was in cup and cup turned upside down but not placed? It says places it on table. So ball on table. If someone turns cup upside down and places it on table, perhaps the ball is now inside the upside-down cup, resting on table, because the opening is down and ball can't fall if cup is placed over it? But to get ball inside an upside-down cup, you'd need to invert cup over ball; not "put into cup" initially. The initial "ball is put into a normal cup" then inverted: ball falls out. So answer on table.
+
+Could there be a trick: cup picked up and put into microwave, ball might be in microwave if ball was stuck to inside of cup? Not normal. The phrase "normal cup" maybe no lid. So ball falls.
+
+Need final only. Ensure labels A1-A4. No markdown? Fine.
+</think>
+
+A1. On the table.  
+A2. 2 apples.  
+A3. 9.8 is bigger.  
+A4. 1 sister.

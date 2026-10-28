@@ -1,0 +1,167 @@
+We need answer user's request. Need solve bugs. Need think carefully.
+
+We have cart.py and tests. Need find bugs so tests pass. Must not change tests. Need provide full fixed cart.py in one python code block, then explanation.
+
+Let's analyze.
+
+Functions:
+line_total(price_pence, qty) returns price*qty. OK.
+apply_discount(total_pence, percent): docstring says percent off, rounded to nearest penny (half rounds up). Current: return total_pence - (total_pence * percent) // 100. This computes floor of discount, not nearest, half up. Test: apply_discount(999,15): discount = 999*15/100=149.85, nearest penny half up? 150, total 849. Current floor: 149, returns 850. Need round half up. Since pence ints, can do discount = (total_pence * percent * 2 + 100) // 200? Let's derive. Need round to nearest integer, half rounds up. For positive values. discount_amount = total*percent/100. Round half up: floor(x + 0.5). With integer: floor((total*percent + 50)/100)? Wait half up for .5: e.g. 149.85 -> int? Actually total*percent = 14985, /100=149.85, round nearest =150. Formula floor((a + 50)/100) if a integer? For a=14985: (14985+50)//100=150. For exact .5: a=15000 -> (15000+50)//100=150? floor(150.5)=150? Wait if x=150 exactly? No .5 means a mod 100 = 50. Example discount amount 149.5: a=14950; nearest half up should 150. formula (14950+50)//100=150. For x=150.5: a=15050 -> (15050+50)//100=151. OK. But if percent can be >100? still positive. Could use (total_pence * percent + 50) // 100. However careful: rounding to nearest penny of discount, then subtract. For total*percent maybe huge. OK. Alternative use Decimal? Simpler integer. But docstring half rounds up. Need ensure test passes. apply_discount(999,15): discount=(999*15+50)//100=150; return 849.
+
+Now cart_total:
+subtotal sum lines. total=apply_discount(subtotal, discount_percent). if total > free_shipping_over: return total; return total+shipping.
+
+Tests:
+test_basic: cart_total([(1000,2)]) == 2399. subtotal=2000, no discount, total=2000. free_shipping_over default 5000. 2000 >5000 false, return 2399. OK.
+
+test_free_shipping_boundary: spending exactly threshold earns free shipping. cart_total([(2500,2)]) ==5000. subtotal=5000. current if total > free_shipping_over false, returns 5399. Need >=. Bug: boundary should be >=.
+
+test_discount_rounding passes with fixed apply_discount.
+
+test_discount_then_shipping: cart_total([(3000,2)], discount_percent=20) == 4800+399. subtotal=6000, discount 20% =1200, total=4800. free shipping threshold 5000. 4800 >5000 false, returns 5199. OK. If boundary >= no change.
+
+Any other bugs? Let's inspect. apply_discount rounding: current uses floor. Need fix. But also potential bug: percent off rounded to nearest penny half rounds up. Could implement discount = (total_pence * percent + 50) // 100. But if total_pence negative? Not needed. Could also use total_pence - round... But ensure no floating point.
+
+But wait: test_discount_then_shipping expects 4800+399, so shipping applied even though discounted total below threshold. OK.
+
+Potential hidden bug: free_shipping_over default parameter compared to total after discount? Maybe correct? Tests don't specify. Could be threshold on subtotal? But tests: test_free_shipping_boundary exactly threshold no discount. test_discount_then_shipping discounted total below threshold, expects shipping. If threshold applied to subtotal, subtotal=6000 >5000 would free shipping, expected 4800 not 5199. So threshold after discount is correct.
+
+Potential bug: apply_discount rounding half up: formula (total*percent + 50)//100 works for positive. But if percent=15, total=999: OK. But docstring says rounded to nearest penny (half rounds up). Could there be issue with integer division for negative? Not relevant. Could use:
+discount = (total_pence * percent * 2 + 100) // 200? Let's compare: For a=total*percent, want floor(a/100 + 0.5) = floor((a+50)/100). Equivalent. The *2 formula: floor((2a+100)/200) = floor((a+50)/100). OK. Simpler +50.
+
+Need consider percent maybe not integer? Type int. OK.
+
+Need output full fixed cart.py in one code block, then explanation. Should we include only code block then explanation. Need ensure code passes. Could include docstrings. Need not change tests.
+
+Let's think if there are any hidden issues with rounding: apply_discount(total_pence, percent) returns total - discount. If discount amount rounded to nearest penny half up. Suppose total=1, percent=50: discount=0.5 -> half up 1, total=0. Formula (50+50)//100=1. OK. Suppose total=999, percent=15: OK. Suppose total=100, percent=15: discount=15 exactly, formula (1500+50)//100=15? 1550//100=15. OK. Suppose total=199, percent=50: discount=99.5 -> 100, formula (9950+50)//100=100. OK.
+
+But if percent large causing discount > total? Could return negative. Not in tests. Could clamp? Not specified. Don't overcomplicate.
+
+Need maybe fix line_total? price_pence * qty. OK.
+
+Need maybe items can be list of tuples. OK.
+
+Let's consider if free_shipping_over boundary should be >=. Test comment says spending exactly threshold earns free shipping. Yes.
+
+Need maybe shipping added if total == free_shipping_over? fixed.
+
+Need explanation: two bugs: apply_discount used floor division, causing discount 149 instead of 150; free shipping condition used > not >=, causing exactly threshold to pay shipping. Could mention integer rounding formula.
+
+Need final answer with code block and explanation. Ensure code block only one? User: Reply with full fixed cart.py in one ```python code block, then explanation. So final: code block, then text. Could include no extra before. Need ensure code is complete.
+
+Let's craft fixed cart.py:
+```python
+"""Tiny shopping-cart module with a bug hidden in it."""
+
+def line_total(price_pence: int, qty: int) -> int:
+    return price_pence * qty
+
+def apply_discount(total_pence: int, percent: int) -> int:
+    """Percent off, rounded to the nearest penny (half rounds up)."""
+    discount = (total_pence * percent + 50) // 100
+    return total_pence - discount
+
+def cart_total(items, discount_percent=0, free_shipping_over=5000, shipping=399):
+    subtotal = sum(line_total(p, q) for p, q in items)
+    total = apply_discount(subtotal, discount_percent)
+    if total >= free_shipping_over:
+        return total
+    return total + shipping
+```
+
+Need think if rounding formula should be based on discount amount or total? The docstring: "Percent off, rounded to the nearest penny (half rounds up)." So discount amount rounded. Good.
+
+But potential issue: If total_pence * percent + 50 overflows? Python no.
+
+Could there be a bug in apply_discount with negative percent? Not tests. If percent negative, formula weird. Not needed.
+
+Let's run mentally tests:
+test_basic: 2000 >=5000 false ->2399.
+test_free_shipping_boundary: 5000 >=5000 true ->5000.
+test_discount_rounding: discount=(999*15+50)//100=15045? Wait 999*15=14985, +50=15035, //100=150. return 849. Yes.
+test_discount_then_shipping: subtotal=6000, discount=(6000*20+50)//100=120050//100=1200, total=4800, >=5000 false, +399=5199. Expected 4800+399=5199. OK.
+
+Need maybe mention that original apply_discount computed discount with floor division `//`, which always rounds down, not nearest/half-up. The fix adds 50 pence before integer division to round to nearest with halves up. Wait adding 50 to `total*percent` before dividing by 100: Since `total*percent` is pence*percent, adding 50 (pence) corresponds to adding 0.50 pence? Let's ensure: We want round (a/100) to nearest integer half up. Add 0.5 to a/100 then floor. Equivalent floor((a + 50)/100). Yes. Good to explain.
+
+Need maybe mention condition changed from `>` to `>=`.
+
+Could there be another subtle bug: `free_shipping_over=5000` default, but test_free_shipping_boundary uses exactly threshold. Yes.
+
+Need final not too verbose but enough. Desired oververbosity 9, but user asks brief explanation. We can provide concise but thorough. Maybe include bullet list.
+
+Need ensure no analysis in final. OK.
+
+Double-check if any requirement: "Do not change the tests." We don't. "Briefly explain each bug." We'll do.
+
+Potential alternative: Use `round`? Python round banker's rounding, not half up. Could mention avoided. But not necessary. Could mention integer formula avoids floating point and banker's rounding.
+
+Let's consider if the tests might import `apply_discount` and expect exact behavior for other hidden cases? Only given tests. But maybe hidden tests? The prompt says tests in test_cart.py fail; fix bugs so all tests pass. Could be only these. But robust code good.
+
+Could there be issue with `apply_discount` when percent=100: discount=(total*100+50)//100 = total + 0? e.g. total=999: 99900+50=99950//100=999, total=0. OK. percent=101: discount=total+? Could negative total. Not relevant. Could clamp discount to total? Not specified; doing so might alter expected hidden? Probably not. Avoid.
+
+Could there be issue with free shipping when discount makes total exactly threshold? Should free shipping? The condition after discount uses >=. Reasonable. Test doesn't cover but consistent.
+
+Need maybe preserve module docstring? Could update? Not necessary. Could keep original docstring though says bug hidden. Maybe better to keep or update? Full fixed cart.py. Could change docstring to no bug? Not required. But maybe avoid saying bug hidden? It's okay. Could keep exactly.
+
+Let's think if `apply_discount` formula with +50 is correct for "half rounds up" when percent results in fractional pence with denominator 100. Yes. But if `total_pence * percent` is negative? Not relevant. For positive. If we wanted robust for negative, use Decimal. Not needed.
+
+Need final code in one python code block. Then explanation. Could format:
+
+```python
+...
+```
+
+**Bugs fixed**
+1. ...
+2. ...
+
+Need ensure explanation after code. Good.
+
+Let's produce final.
+</think>
+
+```python
+"""Tiny shopping-cart module."""
+
+def line_total(price_pence: int, qty: int) -> int:
+    return price_pence * qty
+
+def apply_discount(total_pence: int, percent: int) -> int:
+    """Percent off, rounded to the nearest penny (half rounds up)."""
+    discount = (total_pence * percent + 50) // 100
+    return total_pence - discount
+
+def cart_total(items, discount_percent=0, free_shipping_over=5000, shipping=399):
+    subtotal = sum(line_total(p, q) for p, q in items)
+    total = apply_discount(subtotal, discount_percent)
+    if total >= free_shipping_over:
+        return total
+    return total + shipping
+```
+
+**Bugs fixed**
+
+1. **Discount rounding was wrong in `apply_discount`**
+   - Original code:
+     ```python
+     total_pence - (total_pence * percent) // 100
+     ```
+   - This uses floor division, so the discount always rounds down.
+   - For example, `apply_discount(999, 15)` calculates a discount of `149` instead of the required rounded value `150`.
+   - Fixed by rounding the discount to the nearest penny with halves rounding up:
+     ```python
+     discount = (total_pence * percent + 50) // 100
+     ```
+
+2. **Free shipping boundary condition was wrong in `cart_total`**
+   - Original code:
+     ```python
+     if total > free_shipping_over:
+     ```
+   - This charges shipping when the total is exactly equal to the free-shipping threshold.
+   - The test comment says spending exactly the threshold earns free shipping, so the condition should be:
+     ```python
+     if total >= free_shipping_over:
+     ```
+
+With those fixes, all tests pass.

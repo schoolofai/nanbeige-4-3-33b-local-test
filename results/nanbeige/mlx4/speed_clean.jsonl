@@ -1,0 +1,3 @@
+{"i": 0, "gen_tokens": 600, "gen_tps": 16.15, "prompt_tps": 95.1, "peak_mem_gb": 18.82}
+{"i": 1, "gen_tokens": 600, "gen_tps": 14.3, "prompt_tps": 41.8, "peak_mem_gb": 18.82}
+{"i": 2, "gen_tokens": 600, "gen_tps": 14.52, "prompt_tps": 43.1, "peak_mem_gb": 18.82}

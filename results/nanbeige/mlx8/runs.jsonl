@@ -1,0 +1,4 @@
+{"name": "speed", "wall_s": 69.5, "prompt_tokens": 45, "prompt_tps": 78.2, "gen_tokens": 600, "gen_tps": 8.74, "peak_mem_gb": 35.37, "finish": "length"}
+{"name": "t2_puzzle", "wall_s": 266.5, "prompt_tokens": 168, "prompt_tps": 62.2, "gen_tokens": 2344, "gen_tps": 8.89, "peak_mem_gb": 35.81, "finish": "stop"}
+{"name": "t3_bug", "wall_s": 296.3, "prompt_tokens": 492, "prompt_tps": 86.7, "gen_tokens": 2578, "gen_tps": 8.87, "peak_mem_gb": 35.93, "finish": "stop"}
+{"name": "t1_game", "wall_s": 3897.9, "prompt_tokens": 133, "prompt_tps": 139.9, "gen_tokens": 30499, "gen_tps": 7.83, "peak_mem_gb": 41.97, "finish": "stop"}

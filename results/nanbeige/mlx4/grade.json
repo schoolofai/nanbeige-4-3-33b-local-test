@@ -1,0 +1,62 @@
+{
+ "tag": "mlx4",
+ "runs": [
+  {
+   "name": "speed",
+   "wall_s": 41.8,
+   "prompt_tokens": 45,
+   "prompt_tps": 18.4,
+   "gen_tokens": 600,
+   "gen_tps": 15.31,
+   "peak_mem_gb": 18.82,
+   "finish": "length"
+  },
+  {
+   "name": "t2_puzzle",
+   "wall_s": 91.3,
+   "prompt_tokens": 168,
+   "prompt_tps": 68.7,
+   "gen_tokens": 1219,
+   "gen_tps": 13.73,
+   "peak_mem_gb": 19.02,
+   "finish": "stop"
+  },
+  {
+   "name": "t3_bug",
+   "wall_s": 273.5,
+   "prompt_tokens": 492,
+   "prompt_tps": 84.7,
+   "gen_tokens": 3580,
+   "gen_tps": 13.38,
+   "peak_mem_gb": 19.64,
+   "finish": "stop"
+  },
+  {
+   "name": "t1_game",
+   "wall_s": 3342.3,
+   "prompt_tokens": 133,
+   "prompt_tps": 150.1,
+   "gen_tokens": 36346,
+   "gen_tps": 10.88,
+   "peak_mem_gb": 26.77,
+   "finish": "stop"
+  }
+ ],
+ "t2_answer": "A1. On the table.  \nA2. 2 apples.  \nA3. 9.8 is bigger.  \nA4. 1 sister.",
+ "t2_has_think_close": true,
+ "t3_pytest": "4 passed in 0.01s",
+ "t1_check": {
+  "load_check": {
+   "errors": [],
+   "external_requests": [],
+   "canvas": [
+    [
+     480,
+     480
+    ]
+   ]
+  },
+  "gameplay": "PASS: starts, moves, eats 6 (score and length +1 each, HUD matches), game over on self and wall, restart at 0, 0 errors",
+  "max_tokens": 131072
+ }
+}

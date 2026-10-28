@@ -1,0 +1,2166 @@
+The user wants a complete Snake game in a single self-contained HTML file. Requirements:
+
+- 20x20 grid on canvas
+- Arrow keys and WASD controls
+- Snake grows when it eats food
+- Score display on screen
+- Game over on wall or self collision
+- Space to restart
+- Speed increases slightly every 5 points
+
+I want to make this feel crafted and lively — layered background, motion, micro-interactions, strong typographic contrast. Snake games naturally lean toward retro arcade aesthetics. I can go with a rich arcade look: deep teal/emerald board with warm accents, or something more distinctive like a CRT arcade cabinet vibe. Let me think of a strong palette.
+
+Options:
+1. Retro arcade: dark background, phosphor green — feels a bit overdone.
+2. Deep ocean/teal board with coral/amber food, cream snake — fresh and distinctive.
+3. Garden theme: grass green board, red apple food, wooden frame.
+
+Let me go with a "deep-sea neon arcade" but avoid the plain black + single neon. Instead: rich dark blue-green background with layered elements (subtle grid, vignette, drifting particles), board with its own color scheme — deep green board, bright lime/spring snake with gradient segments, glowing red-orange food with pulse animation. Score display in a distinctive display font.
+
+Typography: pair a distinctive display face with a legible body face. Since no external libraries or network requests allowed — Google Fonts is a network request, so I should avoid it. Use system font stacks. Can craft with system fonts: display could be a monospace stack ("Courier New", monospace) for an arcade feel, or use ui-rounded. Better: use system stack creatively — e.g., display: "Segoe UI Black", "Arial Black", Impact fallback… hmm. For a self-contained file, system fonts are safest.
+
+Let me design:
+
+- Page background: layered — deep gradient (dark petrol/teal), subtle animated scanlines or drifting glow, maybe floating particles on canvas or CSS.
+- Header: game title in a bold display face, score panel with big digits.
+- Canvas: 20x20 grid. Cell size computed. Draw board with subtle checker, grid lines, food with glow + pulse, snake with rounded segments, eyes on the head, smooth motion (interpolated movement for polish? That's extra complexity but nice — could implement interpolation between ticks for buttery motion).
+
+Interpolation: game logic on fixed tick; render at 60fps interpolating between previous and current position. This gives a lively feel. Let me implement carefully.
+
+Features to include:
+- Start screen? The requirement says press Space to restart on game over. Also initial state — probably start with "Press Space / any arrow to start". Keep it simple: game starts immediately or with overlay "Press Space to start". Requirement: "press Space to restart" — implement Space to restart on game over, and also start game initially.
+- Speed increases slightly every 5 points: base interval e.g. 140ms, decrease by ~6% per 5 points, with a cap.
+- Score shown on screen: HUD with score, maybe high score too (in-memory).
+- Arrow keys + WASD. Prevent default scrolling on arrows/space.
+- Direction queue to prevent accidental self-reversal (buffer input).
+- Food doesn't spawn on snake.
+- Game over overlay with score, Space to restart.
+- Speed indicator maybe.
+
+Visual polish:
+- Snake drawn as connected rounded path with gradient; head with eyes; subtle glow.
+- Food: glowing orb with pulse (sin), maybe a small sparkle.
+- Grid: subtle checkerboard.
+- Screen shake on death? Small shake + flash. Nice micro-interaction.
+- Score pop animation when eating (floating "+10" or score bump).
+- Combo/speed up flash on level up (every 5 points): brief banner "SPEED UP!".
+
+Layout: open with the game itself — cabinet-style frame around canvas, title marquee on top like an arcade cabinet. That's distinctive. HUD: score and best on top of canvas.
+
+Palette:
+- Page bg: deep ocean blue-green (#06171c → #0a2230 gradient), with faint radial glows in teal and amber, plus drifting particles (CSS-animated dots).
+- Cabinet frame: dark panel with subtle border, maybe amber/red accent stripes.
+- Board: dark green (#0c2b22 / #0e3327) with faint grid; snake in spring green (#7ef29a → #2fbf71 gradient); food in hot coral/red (#ff5a5f) with amber glow.
+- Accents: amber (#ffb703) for score/highlights, coral for food.
+
+Fonts: system stack. Display: "Impact, 'Haettenschweiler', 'Arial Narrow Bold', sans-serif" might render inconsistently; better use heavy weight of system-ui/Segoe UI with letter-spacing, or monospace for score digits (tabular). Pair: display = `"Segoe UI", system-ui` heavy uppercase with wide tracking; score digits in monospace stack for that arcade feel. Body: system-ui. Actually, to give a distinctive display without webfonts, I can use a monospace stack for headings ("Courier New" / ui-monospace) — arcade CRT vibe. Pair: display: monospace (Courier New, ui-monospace) bold with letter-spacing; body/UI: system-ui. That's a real pairing.
+
+Hmm, let me pick: heading/score digits in `ui-monospace, "Courier New", monospace` bold; labels/body in `system-ui, -apple-system, "Segoe UI", sans-serif`. Good contrast in type size/weight.
+
+Canvas rendering details:
+
+Grid 20x20. Canvas size responsive: use fixed logical size e.g. 480x480 (cell=24), CSS scales to fit container (max-width). Use devicePixelRatio scaling for sharpness.
+
+Game loop: requestAnimationFrame with accumulator; tick interval based on score: interval = max(60, 140 * pow(0.94, floor(score/5)))? "Speed increases slightly every 5 points" — every 5 points of score. So level = floor(score/5); speed = base * decay^level with cap. Base 150ms, decay ~0.93, min 65ms. Show level/speed in HUD.
+
+Interpolated rendering: keep snake as array of {x,y} grid cells. Each tick, compute new positions. For rendering at frame time t in [0,1) of current tick, position of segment i = lerp(prev[i], curr[i], t). Need to handle growth: when snake grows, new tail segment — prev array shorter; handle by clamping index. Simpler approach: keep `prevSnake` snapshot before tick; when rendering segment i, prevPos = prevSnake[i] if exists else curr[i] (new tail stays). Actually when growing, curr has one more segment than prev; for the extra segment use its current position (tail doesn't move that tick anyway… well, tail stays). Let me implement: for i in 0..curr.length-1: p0 = prev[i] ?? curr[i]; but when snake moves without growth, prev and curr same length and prev[i] corresponds to position of segment i before move — segment i moved from prev[i] to curr[i]. Wait, direction: snake array is head first. After move, new head = curr[0], rest follow. Segment i's previous position is prev[i]. For growth: curr = [newHead, ...prev] (length+1). Segment i (i>=1) previous position prev[i], current position curr[i] = prev[i-1]. So lerp(prev[i], curr[i]) works for i < prev.length; for last extra segment i == prev.length, use curr[i] constant.
+
+But subtle: when not growing, tail segment prev[last] moves to curr[last]… actually without growth, curr = [newHead, ...prev.slice(0,-1)], so curr[last] = prev[last-1]; segment last's previous position prev[last] is vacated. lerp(prev[last], curr[last]) would make tail slide forward — correct behavior (tail moves forward as body follows). Good.
+
+Collision: check new head against walls and against body excluding tail cell if tail is about to move and not growing (classic rule). Simpler and safe: check against all body cells except the tail cell when not growing. Many implementations just check against all — slightly stricter. Let me implement the lenient version: bodyToCheck = growing ? snake : snake.slice(0, -1).
+
+Input queue: store desired directions; on tick, take next valid direction (not reverse of current). Maintain currentDir. Queue up to 2.
+
+Death: on collision, state='dead', record best score, show overlay, screen shake, maybe particles. Space restarts.
+
+Also handle: pause with P or Esc? Not required; can add pause with P as bonus. Keep it but subtle. Actually adding pause adds complexity to controls; let me add it — small.
+
+Speed up banner: DOM element over canvas, animate on level change ("SPEED UP!" flash). Nice.
+
+Score bump: add class to score element, remove after animation.
+
+Food pulse: radius + glow via sin(time).
+
+Ambient background: CSS — layered radial gradients + animated floating specks (a few absolutely-positioned divs with float animation) + subtle scanline overlay on cabinet. Keep performant.
+
+Also a small footer hint line: "Arrow keys / WASD to steer · Space to restart".
+
+Start overlay: initial state 'ready' with overlay "SNAKE" + "Press Space or an arrow key to start". Requirement is game playable; starting with overlay is fine and gives polish. Space or arrow starts.
+
+Let me write the code.
+
+Structure:
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SNAKE — Arcade</title>
+<style>...</style>
+</head>
+<body>
+  <div class="scene">
+    <div class="cabinet">
+      <div class="marquee"><h1>SNAKE</h1><span class="marquee-sub">ARCADE</span></div>
+      <div class="hud">
+        <div class="stat"><label>SCORE</label><span id="score">0</span></div>
+        <div class="stat"><label>BEST</label><span id="best">0</span></div>
+        <div class="stat"><label>SPEED</label><span id="speed">1</span></div>
+      </div>
+      <div class="stage">
+        <canvas id="game"></canvas>
+        <div class="overlay" id="overlay"> ... dynamic ... </div>
+        <div class="banner" id="banner"></div>
+      </div>
+      <div class="controls-hint">...</div>
+    </div>
+  </div>
+<script>...</script>
+</body>
+</html>
+```
+
+CSS highlights:
+
+- body: background layered: base #05131a; radial glows teal/amber; plus subtle noise via repeating-linear-gradient scanlines at low opacity; maybe a slowly moving conic sheen. Floating specks: .mote elements animated with keyframes float, generated in JS or hardcoded a few divs. Let me hardcode ~6 motes with different delays/positions via nth-child.
+
+- cabinet: background dark panel #0d1f27 with border, border-radius ~18px (not uniform everywhere; vary: stage more rounded, buttons squircle). Box-shadow for depth, amber top edge accent line.
+
+- marquee: like an arcade marquee — amber/red gradient background? Use solid amber (#ffb703) with dark text, bold monospace, slight inner gloss. Distinctive.
+
+- hud: three stats, big monospace digits, labels small letter-spaced. Score value bigger.
+
+- stage: position relative; canvas display block, width 100%, max 520px; aspect-ratio 1.
+
+- overlay: absolute inset 0, backdrop rgba dark + slight blur, content centered; big title, instructions; hidden class toggles.
+
+- banner: absolute centered, amber text with pop animation.
+
+- score bump keyframe: scale 1→1.35→1.
+
+- shake keyframe on stage on death.
+
+- focus/keyboard: prevent default on arrows/space.
+
+JS:
+
+```js
+const GRID = 20;
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const CELL = 24; // logical
+canvas.width = GRID*CELL; canvas.height = GRID*CELL;
+```
+
+Handle DPR: set canvas.width = size*dpr, ctx.setTransform(dpr,0,0,dpr,0,0). Compute size from CSS? Simpler: fixed logical 480, scale via CSS; set backing store with dpr once.
+
+Game state:
+
+```js
+let state='ready'; // ready | playing | dead | paused
+let snake, prevSnake, dir, dirQueue, food, score, best, level, tickMs, acc, lastTime;
+```
+
+reset():
+- snake = [{x:10,y:10},{x:9,y:10},{x:8,y:10}]
+- dir = {x:1,y:0}
+- dirQueue=[]
+- score=0; level=0; tickMs=BASE; updateHUD
+- spawn food
+- state='playing' (or keep 'ready' until start pressed)
+
+startGame(): reset + state='playing'.
+
+spawnFood(): pick random empty cell not on snake.
+
+tick():
+- acc handled in frame loop.
+- process dir queue: while dirQueue.length && dirQueue[0] is not reverse of dir → shift to dir.
+  Actually: pick first queued direction that isn't reverse of current dir; if valid, set dir; remove consumed entries? Simpler: filter queue: while queue has entries, peek; if opposite of dir, shift and continue; else take it, shift, break.
+- newHead = head + dir
+- wall collision → die
+- self collision (against snake minus tail if not growing) → die
+- unshift newHead; if ate food (newHead == food): score+=10? Requirement just says score shown; let's do +1 for score? Classic: +1 per food. Let me use +1 per food, and speed up every 5 points → level = floor(score/5). Show "SPEED UP" banner at level boundaries. Score display = score. Hmm, +10 per food makes 5 points every half food — too fast. Use +1 per food; speed up every 5 foods. Good.
+
+Actually let me make score increment 1 per food. Level = floor(score/5). tickMs = BASE * Math.pow(SPEED_DECAY, level), clamped to MIN. BASE=150, decay=0.92, MIN=62. Every 5 points: 150→138→… nice.
+
+- if ate: score++, level = floor(score/5); if level changed → banner + maybe flash; spawnFood; bump score; maybe particle burst at food position.
+- else: pop tail.
+- prevSnake = snapshot before modification? Order: capture prevSnake = snake.slice() before moving. Then compute.
+
+die(): state='dead'; update best; show overlay with score; shake; maybe confetti particles.
+
+frame(t):
+- dt = t - lastTime; lastTime=t; clamp dt.
+- if playing: acc += dt; while acc >= tickMs: acc -= tickMs; doTick(); (guard max ticks per frame to avoid spiral)
+- render(time, alpha), alpha = acc/tickMs.
+
+render(alpha, time):
+- clear; draw board background with checker + faint grid lines.
+- draw food with pulse using time.
+- draw snake with interpolation.
+- subtle glow under snake head.
+
+Drawing snake: build points array: for i in snake: lerp(prev[i]||curr[i], curr[i], alpha) → pixel coords center. Draw as thick rounded path: use lineJoin round, lineCap round, stroke polyline with gradient? Canvas stroke gradient along path is tricky; simpler: draw per-segment circles + connecting thick line, color per segment via hsl interpolation from head color to tail color. Approach: stroke the whole polyline with base color at full width; then overlay circles per segment with color varying by index for a gradient effect; head circle slightly bigger with eyes.
+
+Better look: draw each segment as a rounded rect/circle slightly overlapping, radius ~ CELL*0.42, color = hsl interpolation (head ~150,28%,60% → tail ~175,35%,45%?) Let me pick: head #a7f3a0 bright, tail #1f9e63 deep. Add belly stripe? Keep it clean.
+
+Eyes: two small dark dots on head oriented toward dir, with white highlight.
+
+Also draw tongue? Maybe flicker occasionally — cute detail: every ~1.2s, draw a small red forked tongue for 150ms. Nice living detail. Implementation: if (time % 1400 < 160) draw tongue.
+
+Food: pulsing radius r = CELL*0.32 + sin(time*4)*1.5; glow via shadowBlur; color #ff5d5d with white core. Maybe draw small orbiting sparkle.
+
+Board: base fill #0b2a20; checker slightly lighter #0d3125; grid lines rgba(255,255,255,0.03).
+
+Also draw subtle inner border glow.
+
+Particles on eat: array of {x,y,vx,vy,life,color}; update in frame; draw as small squares. On death: burst from head.
+
+HUD updates: score element textContent; bump class.
+
+Speed display: level number (e.g. "×1"…). Show level as "SPEED " + level. Update on level change.
+
+Overlay content builder:
+- ready: big "SNAKE", sub "Press SPACE or an arrow key / WASD to start", maybe animated snake icon? Keep text + key glyphs.
+- dead: "GAME OVER", "Final Score: N", best if new record ("NEW BEST!" tag), "Press SPACE to restart".
+
+Banner: function flashBanner(text) → set text, remove/add class to restart animation.
+
+Keyboard handler:
+```js
+const KEYS = {ArrowUp:{x:0,y:-1}, KeyW:...} // use e.code
+```
+Use e.code: ArrowUp/ArrowDown/ArrowLeft/ArrowRight, KeyW/KeyA/KeyS/KeyD. Space → restart (if dead/ready) else maybe pause? Space during play: pause? Requirement is Space to restart; let me make Space during play do nothing (or pause). Let me add pause with P and Esc; Space reserved for start/restart to match requirement.
+
+preventDefault on arrows/space to avoid scroll.
+
+dirQueue push with max 3, ignore same-as-current direction.
+
+Pause: state='paused', show overlay "PAUSED".
+
+visibilitychange → auto-pause when hidden during play. Nice touch.
+
+Resize: canvas CSS max-width; backing store fixed at 480*dpr — fine.
+
+Motes: create in JS? Simpler hardcoded in HTML: 8 spans with class mote, CSS animates translate/opacity with different durations via nth-child delays. Positioned fixed across page behind cabinet, low opacity amber/teal.
+
+Also add a decorative scanline overlay on stage via ::after with repeating-linear-gradient, opacity 0.06 — CRT feel. And a slight vignette on stage via inset box-shadow.
+
+Let me also consider the header/opening: the cabinet with marquee is the opener — good, distinctive to subject.
+
+Small extra details:
+- Score popup floating text "+1" rising from food position — implement as DOM element? Simpler: canvas particle burst covers it. Let me add a floating score text drawn on canvas at food position rising and fading. Manage array of floaters {text, x, y, life}. Draw with monospace font.
+
+- Speed up: banner + brief canvas border flash on stage (class 'boost' on stage → box-shadow animation).
+
+Let me write the final code carefully, ensuring correctness.
+
+Edge cases:
+- spawnFood when snake fills board → win condition. Handle: if no empty cells, state='win' overlay. Rare but let me handle gracefully: treat as win, stop.
+
+Let me write JS in full.
+
+```js
+(() => {
+  'use strict';
+  const GRID = 20;
+  const CELL = 24;
+  const BASE_MS = 150;
+  const SPEED_DECAY = 0.92;
+  const MIN_MS = 62;
+
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const W = GRID * CELL, H = GRID * CELL;
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const el = {
+    score: document.getElementById('score'),
+    best: document.getElementById('best'),
+    speed: document.getElementById('speed'),
+    overlay: document.getElementById('overlay'),
+    stage: document.getElementById('stage'),
+    banner: document.getElementById('banner'),
+    finalScore: ..., // build dynamically in overlay
+  };
+```
+
+Overlay dynamic content: I'll build innerHTML per state.
+
+State vars:
+
+```js
+let state = 'ready';
+let snake, prevSnake, dir, queue, food, score, best, level, tickMs;
+let acc = 0, last = performance.now();
+let particles = [], floaters = [];
+let tongueTimer = 0;
+```
+
+best loaded from localStorage? No network but localStorage is fine and adds persistence. Wrap in try/catch.
+
+resetGame(startImmediately):
+
+```js
+function resetGame(){
+  snake = [{x:9,y:10},{x:8,y:10},{x:7,y:10}];
+  prevSnake = snake.map(s=>({...s}));
+  dir = {x:1,y:0};
+  queue = [];
+  score = 0; level = 0; tickMs = BASE_MS;
+  acc = 0;
+  particles = []; floaters = [];
+  spawnFood();
+  updateHUD();
+  setState(startImmediately ? 'playing' : 'ready');
+}
+```
+
+Wait, initial snake centered-ish: head at (9,10) moving right, body behind. Grid 20, so x from 0..19. Good.
+
+spawnFood:
+
+```js
+function spawnFood(){
+  const occupied = new Set(snake.map(s=>s.x+','+s.y));
+  const free = [];
+  for(let y=0;y<GRID;y++)for(let x=0;x<GRID;x++) if(!occupied.has(x+','+y)) free.push({x,y});
+  if(!free.length){ win(); return; }
+  food = free[(Math.random()*free.length)|0];
+}
+```
+
+doTick:
+
+```js
+function doTick(){
+  // consume queue
+  while(queue.length){
+    const d = queue[0];
+    if(d.x === -dir.x && d.y === -dir.y){ queue.shift(); continue; } // reject reverse
+    if(d.x===dir.x && d.y===dir.y){ queue.shift(); continue; }
+    dir = d; queue.shift(); break;
+  }
+  prevSnake = snake.map(s=>({...s}));
+  const head = {x: snake[0].x + dir.x, y: snake[0].y + dir.y};
+
+  // walls
+  if(head.x<0||head.y<0||head.x>=GRID||head.y>=GRID){ kill(); return; }
+
+  const growing = head.x===food.x && head.y===food.y;
+  const bodyToCheck = growing ? snake : snake.slice(0,-1);
+  for(const s of bodyToCheck){ if(s.x===head.x&&s.y===head.y){ kill(); return; } }
+
+  snake.unshift(head);
+  if(growing){
+    score += 1;
+    const newLevel = Math.floor(score/5);
+    if(newLevel !== level){
+      level = newLevel;
+      tickMs = Math.max(MIN_MS, BASE_MS * Math.pow(SPEED_DECAY, level));
+      flashBanner('SPEED UP!');
+      stage.classList.remove('boost'); void stage.offsetWidth; stage.classList.add('boost');
+      updateHUD();
+    }
+    spawnFood();
+    burst(food.x, food.y, '#ff5d5d');
+    floaters.push({text:'+1', x:(food.x+0.5)*CELL, y:food.y*CELL, life:1, vy:-18});
+    el.score.classList.remove('bump'); void el.score.offsetWidth; el.score.classList.add('bump');
+    updateHUD();
+  } else {
+    snake.pop();
+  }
+}
+```
+
+Note: prevSnake for interpolation — when growing, prevSnake length is shorter by 1; render handles missing index.
+
+kill():
+
+```js
+function kill(){
+  state='dead';
+  burst(snake[0].x+0.5, snake[0].y+0.5, '#7ef29a', 26);
+  // shake
+  stage.classList.remove('shake'); void stage.offsetWidth; stage.classList.add('shake');
+  if(score>best){ best=score; try{localStorage.setItem('snake-best',best)}catch{} newBest=true } else newBest=false;
+  updateHUD(); showOverlay('dead');
+}
+```
+
+win(): state='win'; showOverlay('win').
+
+updateHUD(): score text, best text, speed text = '×'+(level+1)? Requirement is speed increases every 5 points; showing level as speed level: `SPEED ${level+1}`. Let me show `LV ${level+1}`. Label "SPEED", value like "1". Good.
+
+Render:
+
+```js
+function render(alpha, time){
+  // board
+  ctx.fillStyle='#0a241c'; ctx.fillRect(0,0,W,H);
+  for(let y=0;y<GRID;y++)for(let x=0;x<GRID;x++){
+    if((x+y)%2===0){ ctx.fillStyle='rgba(255,255,255,0.028)'; ctx.fillRect(x*CELL,y*CELL,CELL,CELL); }
+  }
+  // grid lines
+  ctx.strokeStyle='rgba(126,242,154,0.05)';
+  ctx.lineWidth=1;
+  ctx.beginPath();
+  for(let i=1;i<GRID;i++){ ctx.moveTo(i*CELL+0.5,0); ctx.lineTo(i*CELL+0.5,H); ctx.moveTo(0,i*CELL+0.5); ctx.lineTo(W,i*CELL+0.5); }
+  ctx.stroke();
+
+  drawFood(time);
+  drawSnake(alpha, time);
+  drawParticles();
+  drawFloaters(time);
+}
+```
+
+drawFood:
+
+```js
+function drawFood(time){
+  const cx=(food.x+0.5)*CELL, cy=(food.y+0.5)*CELL;
+  const pulse = Math.sin(time*0.004)*0.5+0.5;
+  const r = CELL*0.30 + pulse*CELL*0.05;
+  ctx.save();
+  ctx.shadowColor='rgba(255,93,93,0.9)'; ctx.shadowBlur=14+pulse*8;
+  ctx.fillStyle='#ff5d5d';
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+  ctx.shadowBlur=0;
+  ctx.fillStyle='#fff';
+  ctx.beginPath(); ctx.arc(cx-r*0.3,cy-r*0.3,r*0.35,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+  // occasional sparkle
+  ...
+}
+```
+
+drawSnake:
+
+```js
+function drawSnake(alpha, time){
+  const pts=[];
+  for(let i=0;i<snake.length;i++){
+    const cur = snake[i];
+    const prev = prevSnake[i] || cur;
+    const x = (prev.x + (cur.x-prev.x)*alpha + 0.5)*CELL;
+    const y = (prev.y + (cur.y-prev.y)*alpha + 0.5)*CELL;
+    pts.push({x,y});
+  }
+  // glow under head
+  ...
+  // body gradient circles
+  for(let i=pts.length-1;i>=0;i--){
+    const t = i/(Math.max(1,pts.length-1)); // 0 head → 1 tail
+    const hue = 145 - t*25; // ~145→120? Let me use spring green to teal
+    const light = 62 - t*16;
+    ctx.fillStyle = `hsl(${hue} ${light}% 55%)`; // careful with hsl string syntax
+```
+
+Modern browsers support space-separated hsl. To be safe use commas: `hsl(${hue},${light}%,55%)`.
+
+Head slightly bigger: radius CELL*0.44; body CELL*0.40, tail smaller CELL*0.34. Draw from tail to head so head on top.
+
+Add outline: darker stroke around each circle for definition: ctx.strokeStyle rgba(0,0,0,.25), lineWidth 1.5.
+
+Eyes: compute angle from pts[0] to pts[1] (or dir). Eyes perpendicular. Draw two white circles r=2.6 with dark pupil r=1.4 offset toward dir.
+
+Tongue: if (time % 1500 < 180) draw a red forked line from mouth. Mouth position: head front = pts[0] + dir*CELL*0.42.
+
+```js
+function drawSnake(alpha, time){ ... }
+```
+
+Particles:
+
+```js
+function burst(gx,gy,color,n=14){
+  for(let i=0;i<n;i++){
+    const a=Math.random()*Math.PI*2, sp=(Math.random()*0.25+0.12)*CELL;
+    particles.push({x:(gx+0.5)*CELL,y:(gy+0.5)*CELL,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life:1,color:color,size:2+Math.random()*2.5});
+  }
+}
+```
+
+Update particles in frame with dt; gravity slight; fade.
+
+Floaters: rise, fade; draw with ctx font `${14}px ui-monospace, monospace`; alpha=life; y offset vy*life… store base y and draw y = fy + life*30.
+
+Frame loop:
+
+```js
+function frame(now){
+  const dt = Math.min(now-last, 100); last=now;
+  if(state==='playing'){
+    acc+=dt;
+    let guard=0;
+    while(acc>=tickMs && state==='playing' && guard++<5){ acc-=tickMs; doTick(); }
+  } else { acc=0; } // reset acc when not playing? Keep acc small; simpler acc=0
+  render(state==='playing' ? Math.min(acc/tickMs,1) : 0, now);
+  updateParticles(dt);
+  requestAnimationFrame(frame);
+}
+```
+
+Hmm, when state changes to dead mid-loop, render with alpha 0 fine.
+
+updateParticles(dt): p.life -= dt/700; p.x+=vx*dt/16… simpler: p.x += p.vx*(dt/16); vy += 0.05*dt/16 gravity; alpha=life.
+
+Input:
+
+```js
+const DIRS={
+  ArrowUp:{x:0,y:-1}, ArrowDown:{x:0,y:1}, ArrowLeft:{x:-1,y:0}, ArrowRight:{x:1,y:0},
+  KeyW:{x:0,y:-1}, KeyS:{x:0,y:1}, KeyA:{x:-1,y:0}, KeyD:{x:1,y:0},
+};
+window.addEventListener('keydown', e=>{
+  const d = DIRS[e.code];
+  if(d){ e.preventDefault(); if(state==='ready'||state==='dead'){ start(); } else if(state==='playing'){ pushDir(d);} return; }
+  if(e.code==='Space'){ e.preventDefault(); if(state==='ready'||state==='dead'||state==='win') start(); else if(state==='playing') pause(); }
+  if(e.code==='KeyP'||e.code==='Escape'){ if(state==='playing') pause(); else if(state==='paused') resume(); }
+});
+```
+
+Wait — Space during play as pause might confuse "press Space to restart". But restart only matters on game over. Let me keep Space during play = pause? Hmm, might annoy. Alternative: Space during play does nothing. Let me make Space during play do pause — actually many arcade games use space for pause; but risk: accidental space pauses unexpectedly. Let me keep Space strictly start/restart, and pause via P/Esc. Cleaner mapping to requirements.
+
+pushDir:
+
+```js
+function pushDir(d){
+  if(d.x===dir.x&&d.y===dir.y) return;
+  if(d.x===-dir.x&&d.y===-dir.y) return; // ignore reverse
+  if(queue.length<3) queue.push(d);
+}
+```
+
+Also on start via arrow key: start() then pushDir? start() resets dir to right; if user pressed arrow, should set initial direction. In start(): if the key pressed was a direction, set dir accordingly and queue. Implementation: start(dirOverride) — if override valid (not reverse of default right… default dir right, so allow up/down/left), set dir=override.
+
+Simplify: start() resets with dir right; keydown handler: if state ready/dead and d: start(); then pushDir(d) — but pushDir compares to dir right; pressing ArrowLeft at start would be ignored (reverse). Edge case minor; let me handle: in start(dir), accept parameter.
+
+```js
+function start(dirOverride){
+  resetGame();
+  if(dirOverride && dirOverride.x!==-dir.x && dirOverride.y!==-dir.y) dir=dirOverride;
+  hideOverlay();
+}
+```
+
+But resetGame sets state to 'ready' if not startImmediately… let me restructure: resetGame(running) sets state accordingly; start calls resetGame(true) with override.
+
+Overlay show/hide with content builder:
+
+```js
+function showOverlay(kind){
+  let html='';
+  if(kind==='ready'){
+    html = `<div class="ov-title">SNAKE</div>
+      <p class="ov-sub">Steer with <b>arrow keys</b> or <b>WASD</b>.</p>
+      <p class="ov-sub">Eat the coral dots. Speed rises every <b>5 points</b>.</p>
+      <div class="ov-prompt"><span class="key">SPACE</span> to start</div>`;
+  } else if(kind==='dead'){
+    html = `<div class="ov-title ov-title-bad">GAME OVER</div>
+      <div class="final"><span class="lbl">FINAL SCORE</span><span id="finalScore">${score}</span></div>
+      ${newBest?'<div class="newbest">★ NEW BEST ★</div>':''}
+      <div class="ov-prompt"><span class="key">SPACE</span> to restart</div>`;
+  } else if(kind==='win'){ ... }
+  el.overlay.innerHTML=html;
+  el.overlay.classList.remove('hidden');
+}
+```
+
+newBest variable set in kill().
+
+Pause overlay: showOverlay('paused') with "PAUSED — press P to resume".
+
+visibilitychange: if hidden && playing → pause.
+
+flashBanner:
+
+```js
+function flashBanner(text){
+  el.banner.textContent=text;
+  el.banner.classList.remove('show'); void el.banner.offsetWidth; el.banner.classList.add('show');
+}
+```
+
+CSS banner animation: pop with scale/fade, 900ms.
+
+Motes: generate in JS to keep HTML light:
+
+```js
+const scene=document.getElementById('scene')? or body;
+for(let i=0;i<14;i++){ const m=document.createElement('i'); m.className='mote'; m.style.left=Math.random()*100+'%'; m.style.animationDuration=(8+Math.random()*10)+'s'; m.style.animationDelay=(-Math.random()*12)+'s'; document.body.appendChild(m); }
+```
+
+CSS mote: position fixed; width 4-7px; border-radius 50%; background radial amber/teal; opacity animation float: translateY(-30px) and fade in/out. z-index 0; cabinet z-index 1.
+
+Now CSS write-out. Let me define palette variables:
+
+```css
+:root{
+  --bg0:#04121a; --bg1:#0a2230;
+  --panel:#0c1e28; --panel2:#0f2a38;
+  --line:rgba(126,242,154,.14);
+  --text:#e8f5ec; --dim:#8fb3a4;
+  --amber:#ffb703; --coral:#ff5d5d; --green:#7ef29a;
+}
+```
+
+Body background:
+```css
+body{
+  margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+  background:
+    radial-gradient(1100px 600px at 15% -10%, rgba(20,80,90,.55), transparent 60%),
+    radial-gradient(900px 500px at 110% 110%, rgba(255,183,3,.12), transparent 60%),
+    linear-gradient(180deg, var(--bg1), var(--bg0));
+  color:var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  overflow-x:hidden;
+}
+```
+
+Add subtle scanlines on body::before fixed overlay: repeating-linear-gradient rgba(0,0,0,.12) 0 1px transparent 1px 3px; opacity .35; pointer-events none. Maybe too strong; use .25.
+
+Cabinet:
+
+```css
+.cabinet{
+  position:relative; z-index:2;
+  width:min(94vw,560px);
+  background:linear-gradient(180deg,#102836,#0a1d27);
+  border:1px solid var(--line);
+  border-radius:22px;
+  padding:18px 18px 14px;
+  box-shadow:0 30px 60px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06);
+}
+```
+
+Marquee:
+
+```css
+.marquee{
+  display:flex; align-items:baseline; justify-content:space-between; gap:10px;
+  background:linear-gradient(180deg,#ffc63d,#ff9d00);
+  border-radius:12px; padding:10px 16px; margin-bottom:14px;
+  box-shadow: inset 0 2px 0 rgba(255,255,255,.35), 0 6px 16px rgba(255,157,0,.25);
+}
+.marquee h1{
+  margin:0; font-family:ui-monospace,"Courier New",monospace;
+  font-size:clamp(28px,6vw,40px); letter-spacing:.12em; color:#221500; font-weight:800;
+  text-shadow:0 1px 0 rgba(255,255,255,.25);
+}
+.marquee .sub{ font-family:ui-monospace,monospace; font-size:11px; letter-spacing:.4em; color:#5c3d00; align-self:center; }
+```
+
+HUD:
+
+```css
+.hud{display:flex; justify-content:space-between; gap:8px; margin-bottom:12px;}
+.stat{ background:#0a1c26; border:1px solid var(--line); border-radius:12px; padding:8px 14px; min-width:96px; text-align:center;}
+.stat label{ display:block; font-size:10px; letter-spacing:.32em; color:var(--dim); font-weight:700;}
+.stat span{ display:block; font-family:ui-monospace,monospace; font-size:22px; font-weight:700; color:var(--green); line-height:1.1;}
+#score{ color:var(--amber); }
+#speed span color maybe teal.
+.bump{ animation:bump .35s ease; }
+@keyframes bump{ 0%{transform:scale(1)} 40%{transform:scale(1.35)} 100%{transform:scale(1)} }
+```
+
+Stage:
+
+```css
+.stage{
+  position:relative;
+  border-radius:16px;
+  background:#081f18;
+  box-shadow: inset 0 0 40px rgba(0,0,0,.5), 0 0 0 1px rgba(126,242,154,.10);
+  overflow:hidden;
+}
+canvas{ display:block; width:100%; height:auto; aspect-ratio:1/1;}
+.stage::after{ /* scanlines */ content:""; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(0deg, rgba(0,0,0,.14) 0 1px, transparent 1px 3px); opacity:.5; mix-blend-mode:multiply;}
+```
+
+Hmm, multiply on dark bg OK. Or just overlay with low opacity.
+
+Vignette: .stage::before inset box-shadow: `box-shadow: inset 0 0 80px rgba(0,0,0,.45);`
+
+But ::before and ::after both used; order fine.
+
+Shake:
+
+```css
+.stage.shake{ animation:shake .45s cubic-bezier(.36,.07,.19,.97);}
+@keyframes shake{ 0%,100%{transform:translate(0)} 10%{transform:translate(-9px,4px)} 20%{transform:translate(8px,-5px)} 30%{transform:translate(-7px,-3px)} 40%{transform:translate(6px,4px)} 50%{transform:translate(-4px,2px)} 60%{transform:translate(3px,-2px)} 70%{transform:translate(-2px,1px)} }
+```
+
+Boost:
+
+```css
+.stage.boost{ animation:boost .6s ease; }
+@keyframes boost{ 0%{ box-shadow: inset 0 0 40px rgba(0,0,0,.5), 0 0 0 1px rgba(255,183,3,.9), 0 0 34px rgba(255,183,3,.55);} 100%{...normal} }
+```
+
+Simpler: animate outline color via outline? box-shadow keyframes fine.
+
+Overlay:
+
+```css
+.overlay{
+  position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px;
+  background:rgba(4,14,12,.82); backdrop-filter:blur(3px);
+  transition:opacity .25s ease; z-index:5; text-align:center; padding:20px;
+}
+.overlay.hidden{ opacity:0; pointer-events:none; }
+.ov-title{ font-family:ui-monospace,monospace; font-size:clamp(30px,7vw,46px); letter-spacing:.14em; font-weight:800; color:var(--green); text-shadow:0 0 24px rgba(126,242,154,.35); margin:0;}
+.ov-title-bad{ color:var(--coral); text-shadow:0 0 24px rgba(255,93,93,.4);}
+.ov-sub{ margin:0; color:var(--dim); font-size:14px; line-height:1.7;}
+.ov-sub b{ color:var(--text); }
+.final{ display:flex; flex-direction:column; gap:2px; margin-top:6px;}
+.final .lbl{ font-size:10px; letter-spacing:.35em; color:var(--dim);}
+.final span:last-child{ font-family:ui-monospace,monospace; font-size:34px; font-weight:700; color:var(--amber);}
+.newbest{ font-family:ui-monospace,monospace; font-size:12px; letter-spacing:.3em; color:var(--amber); animation:bump 1s infinite;}
+.ov-prompt{ margin-top:10px; font-size:13px; color:var(--dim); letter-spacing:.12em;}
+.key{ display:inline-block; padding:4px 10px; border:1px solid var(--line); border-bottom-width:3px; border-radius:8px; background:#0d2530; font-family:ui-monospace,monospace; font-size:11px; letter-spacing:.25em; color:var(--green);}
+```
+
+Banner:
+
+```css
+.banner{
+  position:absolute; top:34%; left:50%; transform:translate(-50%,-50%);
+  font-family:ui-monospace,monospace; font-weight:800; letter-spacing:.35em; font-size:clamp(18px,4vw,26px);
+  color:#221500; background:linear-gradient(180deg,#ffd166,#ffab00);
+  padding:10px 26px; border-radius:10px; box-shadow:0 0 30px rgba(255,171,0,.5);
+  opacity:0; pointer-events:none; z-index:6; white-space:nowrap;
+}
+.banner.show{ animation:bannerPop .9s ease forwards; }
+@keyframes bannerPop{ 0%{opacity:0; transform:translate(-50%,-50%) scale(.6)} 15%{opacity:1; transform:translate(-50%,-50%) scale(1.08)} 25%{transform:translate(-50%,-50%) scale(1)} 75%{opacity:1} 100%{opacity:0; transform:translate(-50%,-60%) scale(1)} }
+```
+
+Controls hint below stage:
+
+```css
+.hint{ margin-top:12px; text-align:center; font-size:12px; color:var(--dim); letter-spacing:.08em;}
+kbd{ font-family:ui-monospace,monospace; font-size:11px; background:#0d2530; border:1px solid var(--line); border-bottom-width:2px; border-radius:6px; padding:1px 6px; color:var(--text);}
+```
+
+Motes CSS:
+
+```css
+.mote{ position:fixed; border-radius:50%; pointer-events:none; z-index:1; opacity:0;
+  background:radial-gradient(circle at 35% 35%, rgba(255,255,255,.9), rgba(126,242,154,.25) 40%, transparent 70%);
+  animation:mote linear infinite;}
+@keyframes mote{ 0%{transform:translateY(0); opacity:0} 15%{opacity:.7} 85%{opacity:.5} 100%{transform:translateY(-46vh); opacity:0;} }
+```
+
+Alternate mote colors via nth-child even → amber tint.
+
+Responsive: cabinet width min(94vw,560px); canvas scales.
+
+Also handle small screens: hud stats smaller.
+
+Now let me assemble the full JS. Also handle first frame: last=performance.now() at start; call requestAnimationFrame(frame).
+
+Also initial best from localStorage:
+
+```js
+let best=0; try{ best=parseInt(localStorage.getItem('snake-best')||'0',10)||0; }catch(e){}
+```
+
+updateHUD sets el.best textContent = best.
+
+Pause/resume functions:
+
+```js
+function pause(){ if(state!=='playing')return; state='paused'; acc=0; showOverlay('paused'); }
+function resume(){ if(state!=='paused')return; state='playing'; hideOverlay(); last=performance.now(); }
+```
+
+Note: frame loop uses now-last; on resume last should update to avoid dt jump — frame sets last=now each frame anyway, and when paused we skip acc accumulation but last keeps updating. So dt fine. Actually in my frame I always do `const dt=...; last=now;` regardless of state. Good; no jump.
+
+But wait: when paused, render(alpha=0) shows static snake at grid positions — fine.
+
+Also when state==='ready', render shows initial snake and food — nice preview behind semi-transparent overlay.
+
+Floaters drawn on canvas need font setting each frame; fine.
+
+drawFloaters:
+
+```js
+for(let i=floaters.length-1;i>=0;i--){
+  const f=floaters[i]; f.life-=dt? — pass dt.
+```
+
+Let me manage floaters in updateParticles(dt) too.
+
+Simplify: one function updateFx(dt) handling particles and floaters; called each frame.
+
+Floater: {text, x, y (base), life:1}. In update: life-=dt/900; y += dt*0.03 (drift down)? For rising: store startY; draw y = startY - (1-life)*26. Let me store y0 and compute.
+
+Draw: ctx.globalAlpha=life; ctx.font='700 14px ui-monospace, monospace'; ctx.fillStyle='#ffd166'; textAlign center; fillText(text, x, y0-(1-life)*28). Reset alpha.
+
+Eyes drawing detail:
+
+```js
+const head=pts[0], second=pts[1]||pts[0];
+let angle = Math.atan2(second.y-head.y, second.x-head.x);
+// if length 1, use dir
+```
+
+Snake always >=3.
+
+Eyes offset: perpendicular = (-sin, cos) of angle… compute:
+```js
+const fx=Math.cos(angle), fy=Math.sin(angle); // forward
+const ex=-fy, ey=fx; // perpendicular
+const off=CELL*0.16, fwd=CELL*0.13;
+for(const s of [-1,1]){
+  const cx=head.x+fx*fwd+ex*off*s, cy=head.y+fy*fwd+ey*off*s;
+  ctx.fillStyle='#06171c'; circle(cx,cy,2.6)
+  ctx.fillStyle='#fff'; circle(cx-fx*0.8, cy-fy*0.8, 1.5)
+}
+```
+
+Tongue:
+
+```js
+const t=time;
+if(state==='playing' && (t%1600)<200 && acc-based? just time-based){
+  const mx=head.x+fx*CELL*0.46, my=head.y+fy*CELL*0.46;
+  const len=CELL*0.16*(0.5+0.5*Math.sin(t*0.05));
+  ctx.strokeStyle='#ff5d5d'; ctx.lineWidth=2; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(mx,my); ctx.lineTo(mx+fx*len,my+fy*len);
+  // fork
+  ...
+}
+```
+
+Fork: two short lines at end. Compute end point e; perpendicular; draw two segments from e to e + (fx*len*0.4 + perp*len*0.35*±).
+
+OK. Also draw subtle shadow beneath snake: skip for perf/simplicity; instead add darker stroke around circles.
+
+Also draw food little pulse ring: an expanding circle fading — add to particles? Just draw ring: radius CELL*0.5+pulse*…, alpha .25.
+
+Now let me write the final HTML, careful with correctness. Also include a <noscript> fallback? Trivial; skip or add small.
+
+Title: "SNAKE — Arcade".
+
+Also ensure Space doesn't scroll page: preventDefault on Space keydown. Also prevent arrow scroll.
+
+Also prevent arrow keys from triggering when overlay shown but state ready → start. Good.
+
+Another consideration: when state==='dead', pressing arrow also restarts (via handler). That's fine and expected.
+
+Let me write updateHUD:
+
+```js
+function updateHUD(){
+  el.score.textContent=score;
+  el.best.textContent=best;
+  el.speed.textContent='×'+(level+1);
+}
+```
+
+Speed label "SPEED" with value "×1". Good — communicates acceleration.
+
+Also show requirement "speed increases slightly every 5 points" — banner communicates.
+
+Now let me write the whole file, checking syntax mentally.
+
+Also: canvas height auto with aspect-ratio — set style aspect-ratio:1/1; width:100%.
+
+Potential issue: ctx.setTransform with dpr then fillRect uses logical coords — good.
+
+Guard: doTick while loop with state check; kill sets state='dead' → loop exits.
+
+Also handle win overlay:
+
+```js
+function win(){ state='win'; updateHUD(); showOverlay('win'); }
+```
+Overlay win: "YOU WIN!" + score + space to restart.
+
+Also on win, stop acc.
+
+Let me write showOverlay('paused'):
+
+```html
+<div class="ov-title">PAUSED</div><p class="ov-sub">Press <b>P</b> or <b>Esc</b> to resume</p>
+```
+
+hideOverlay adds hidden class.
+
+Initial: resetGame(false) then showOverlay('ready').
+
+Also start() should hide overlay.
+
+Edge: start() while already playing (from arrow during play)? Handler only calls start when ready/dead/win. Good.
+
+Let me write keydown more carefully:
+
+```js
+window.addEventListener('keydown', (e)=>{
+  const d = DIRS[e.code];
+  if(d){
+    e.preventDefault();
+    if(state==='ready'||state==='dead'||state==='win'){ start(d); }
+    else if(state==='playing'){ pushDir(d); }
+    return;
+  }
+  if(e.code==='Space'){
+    e.preventDefault();
+    if(state==='ready'||state==='dead'||state==='win') start();
+    return;
+  }
+  if(e.code==='KeyP'||e.code==='Escape'){
+    if(state==='playing') pause(); else if(state==='paused') resume();
+  }
+});
+```
+
+start(d?) with optional direction override:
+
+```js
+function start(dirOverride){
+  resetGame();
+  if(dirOverride){
+    if(!(dirOverride.x===-dir.x && dirOverride.y===-dir.y)) dir=dirOverride;
+  }
+  hideOverlay();
+}
+```
+
+resetGame sets state='playing'.
+
+But initial page load: resetGameSkeleton → state 'ready' + overlay. Let me make resetGame(running) param:
+
+```js
+function resetGame(running){
+  snake=[{x:9,y:10},{x:8,y:10},{x:7,y:10}];
+  prevSnake=snake.map(o=>({...o}));
+  dir={x:1,y:0}; queue=[];
+  score=0; level=0; tickMs=BASE_MS; acc=0;
+  newBest=false;
+  particles=[]; floaters=[];
+  spawnFood();
+  updateHUD();
+  setState(running?'playing':'ready');
+  if(!running) showOverlay('ready');
+}
+function setState(s){ state=s; }
+```
+
+kill() uses newBest flag:
+
+```js
+function kill(){
+  state='dead';
+  const isRecord = score>best;
+  if(isRecord){ best=score; newBest=true; try{localStorage.setItem('snake-best',String(best))}catch(e){} } else newBest=false;
+  burst((snake[0].x+0.5)*CELL,(snake[0].y+0.5)*CELL,'#7ef29a',26);
+  stage.classList.remove('shake'); void stage.offsetWidth; stage.classList.add('shake');
+  updateHUD();
+  showOverlay('dead');
+}
+```
+
+Note: burst expects grid coords in my earlier design; let me make burst take pixel coords directly. Define burstPx(px,py,color,n).
+
+Food burst uses food pixel coords.
+
+Now render order and functions — let me finalize code.
+
+Also drawSnake when state ready/dead: alpha param 0 → uses prevSnake==curr positions; fine.
+
+When dead, snake stays visible (frozen) — good.
+
+Let me write drawSnake fully:
+
+```js
+function drawSnake(alpha, time){
+  const pts=[];
+  for(let i=0;i<snake.length;i++){
+    const cur=snake[i], prev=prevSnake[i]||cur;
+    pts.push({
+      x:(prev.x+(cur.x-prev.x)*alpha+0.5)*CELL,
+      y:(prev.y+(cur.y-prev.y)*alpha+0.5)*CELL
+    });
+  }
+  const n=pts.length;
+  // draw from tail to head
+  for(let i=n-1;i>=0;i--){
+    const t=n>1?i/(n-1):0;
+    const hue=150-t*22;
+    const sat=65+t*15;
+    const light=60-t*18;
+    const r=CELL*(0.40-t*0.07);
+    ctx.fillStyle=`hsl(${hue},${sat}%,${light}%)`;
+    ctx.beginPath(); ctx.arc(pts[i].x,pts[i].y,r,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='rgba(6,20,14,.35)'; ctx.lineWidth=1.5; ctx.stroke();
+    // sheen highlight
+    ctx.fillStyle='rgba(255,255,255,.10)';
+    ctx.beginPath(); ctx.arc(pts[i].x-r*0.3,pts[i].y-r*0.3,r*0.35,0,Math.PI*2); ctx.fill();
+  }
+  // head eyes + tongue
+  ...
+}
+```
+
+Head color: t=0 → hsl(150,65%,60%) spring green. Tail t=1 → hsl(128,80%,42%) deeper teal-green. Nice gradient.
+
+Eyes:
+
+```js
+const a0=pts[0], a1=pts[1]||pts[0];
+let ang=Math.atan2(a1.y-a0.y,a1.x-a0.x);
+const fx=Math.cos(ang), fy=Math.sin(ang);
+const ex=-fy, ey=fx;
+// tongue first (behind eyes? draw before eyes)
+const mouthX=a0.x+fx*CELL*0.42, mouthY=a0.y+fy*CELL*0.42;
+if(state==='playing' && (time%1700)<220){
+  const len=CELL*0.14*(0.6+0.4*Math.sin(time*0.06));
+  const tipX=mouthX+fx*len, tipY=mouthY+fy*len;
+  ctx.strokeStyle='#ff5d5d'; ctx.lineWidth=2; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(mouthX,mouthY); ctx.lineTo(tipX,tipY); ctx.stroke();
+  const px2=tipX+fx*len*0.35, py2=tipY+fy*len*0.35;
+  ctx.beginPath();
+  ctx.moveTo(tipX,tipY); ctx.lineTo(px2+ex*len*0.9,py2+ey*len*0.9);
+  ctx.moveTo(tipX,tipY); ctx.lineTo(px2-ex*len*0.9,py2-ey*len*0.9);
+  ctx.stroke();
+}
+// eyes
+const off=CELL*0.17, fwd=CELL*0.14;
+for(const s of[-1,1]){
+  const cx=a0.x+fx*fwd+ex*off*s, cy=a0.y+fy*fwd+ey*off*s;
+  ctx.fillStyle='#081712';
+  ctx.beginPath(); ctx.arc(cx,cy,2.9,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#eafff2';
+  ctx.beginPath(); ctx.arc(cx-fx*1.1,cy-fy*1.1,1.6,0,Math.PI*2); ctx.fill();
+}
+```
+
+Good.
+
+drawFood with ring:
+
+```js
+function drawFood(time){
+  const cx=(food.x+0.5)*CELL, cy=(food.y+0.5)*CELL;
+  const pulse=Math.sin(time*0.0045)*0.5+0.5;
+  const r=CELL*(0.28+pulse*0.055);
+  // halo ring
+  ctx.save();
+  ctx.strokeStyle=`rgba(255,93,93,${0.25+pulse*0.2})`;
+  ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(cx,cy,CELL*0.46+pulse*3,0,Math.PI*2); ctx.stroke();
+  ctx.restore();
+  ctx.save();
+  ctx.shadowColor='rgba(255,93,93,.95)'; ctx.shadowBlur=16+pulse*10;
+  ctx.fillStyle='#ff5d5d';
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill();
+  ctx.shadowBlur=0;
+  ctx.fillStyle='#fff';
+  ctx.beginPath(); ctx.arc(cx-r*0.32,cy-r*0.32,r*0.34,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+```
+
+updateFx:
+
+```js
+function updateFx(dt){
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.life-=dt/650;
+    if(p.life<=0){particles.splice(i,1);continue;}
+    p.vy+=dt*0.02; // gravity in px per frame approx — dt*0.02 small
+    p.x+=p.vx*dt/16; p.y+=p.vy*dt/16;
+  }
+  for(let i=floaters.length-1;i>=0;i--){
+    floaters[i].life-=dt/900;
+    if(floaters[i].life<=0)floaters.splice(i,1);
+  }
+}
+```
+
+Gravity dt*0.02: dt~16 → 0.32 px/frame added to vy each frame; vx initial ~ (0.12..0.36)*24 ≈ 3..8 px/frame → over 650ms life (~40 frames) gravity adds ~13 px/frame to vy — too much; snake would fall fast. Reduce: vy += dt*0.006 → ~0.1/frame → ~4px/frame after full life. Still noticeable but OK for burst. Or no gravity, slight drag. Let me use vy += dt*0.004 and vx*=drag. Fine — playful sparks.
+
+Draw particles:
+
+```js
+function drawFx(){
+  for(const p of particles){
+    ctx.globalAlpha=Math.max(0,p.life);
+    ctx.fillStyle=p.color;
+    ctx.fillRect(p.x-p.size/2,p.y-p.size/2,p.size,p.size);
+  }
+  ctx.globalAlpha=1;
+  ctx.textAlign='center';
+  ctx.font='700 15px ui-monospace, monospace';
+  for(const f of floaters){
+    ctx.globalAlpha=Math.max(0,f.life);
+    ctx.fillStyle='#ffd166';
+    ctx.fillText(f.text,f.x,f.y-(1-f.life)*30);
+  }
+  ctx.globalAlpha=1;
+}
+```
+
+burstPx:
+
+```js
+function burstPx(px,py,color,n=14){
+  for(let i=0;i<n;i++){
+    const a=Math.random()*Math.PI*2;
+    const sp=(2+Math.random()*5);
+    particles.push({x:px,y:py,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1.5,life:1,color,size:1.8+Math.random()*2.6});
+  }
+}
+```
+
+Frame loop:
+
+```js
+function frame(now){
+  const dt=Math.min(now-last,100); last=now;
+  if(state==='playing'){
+    acc+=dt;
+    let guard=0;
+    while(acc>=tickMs && state==='playing' && guard++<4){ acc-=tickMs; doTick(); }
+  } else {
+    acc=0;
+  }
+  const alpha=state==='playing'?Math.min(acc/tickMs,1):0;
+  render(alpha,now);
+  updateFx(dt);
+  requestAnimationFrame(frame);
+}
+```
+
+Hmm, acc=0 when not playing resets interpolation each paused frame — fine.
+
+But note: when state transitions playing→dead inside while, acc may exceed; fine.
+
+Also render when ready: alpha=0, shows static snake. Good.
+
+visibilitychange:
+
+```js
+document.addEventListener('visibilitychange',()=>{ if(document.hidden && state==='playing') pause(); });
+```
+
+Motes generation + maybe a faint animated glow behind cabinet: .glow div? Body radial gradient is static; add slow hue drift via body::after with rotate? Keep simple: two blurred blobs with CSS animation drifting (transform translate) — but body overflow hidden? Fixed positioned blobs with keyframes drift alternate 20s. z-index 0. That adds ambient life. Let me add .blob elements (two) with radial-gradient teal/amber, opacity .18, blur via gradient itself, animation float 18s ease-in-out infinite alternate.
+
+OK, also ensure "no external libraries or network requests" — fonts are system only; localStorage fine.
+
+Double-check requirement "20x20 grid on canvas" — GRID=20 ✓. "arrow keys and WASD" ✓. "snake grows when it eats food" ✓ (+1 segment). "score shown on screen" ✓ HUD. "game over when hitting wall or itself" ✓. "press Space to restart" ✓. "speed increases slightly every 5 points" ✓ level=floor(score/5), tickMs decays.
+
+Now let me write the final file. Careful with template literals inside script — fine.
+
+Also add small footer credit line? Hint line is enough.
+
+Let me write CSS fully; ensure valid syntax. Also responsive: on narrow screens, hud stats shrink; marquee h1 clamp.
+
+Another detail: `.stat span` default color green; score amber; speed maybe default green. Fine.
+
+Also ensure overlay hidden initially? We call showOverlay('ready') on load so visible. Initial class: overlay without hidden.
+
+Also add slight entrance animation for cabinet on load: @keyframes rise { from{opacity:0; transform:translateY(16px)} } applied to .cabinet animation 0.6s ease-out. Nice.
+
+Motes count 12.
+
+Let me write it all out, checking syntax mentally.
+
+Also: `el.stage` referenced for shake/boost class — id="stage" on div.wrapper containing canvas+overlay+banner.
+
+HTML skeleton:
+
+```html
+<div class="blob b1"></div><div class="blob b2"></div>
+<main class="cabinet">
+  <div class="marquee"><h1>SNAKE</h1><span class="sub">ARCADE</span></div>
+  <div class="hud">
+    <div class="stat"><label for="score">SCORE</label><span id="score">0</span></div>
+    <div class="stat"><label for="best">BEST</label><span id="best">0</span></div>
+    <div class="stat"><label for="speed">SPEED</label><span id="speed">×1</span></div>
+  </div>
+  <div class="stage" id="stage">
+    <canvas id="game"></canvas>
+    <div class="banner" id="banner"></div>
+    <div class="overlay" id="overlay"></div>
+  </div>
+  <div class="hint">
+    Move: <kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · <kbd>Space</kbd> start / restart · <kbd>P</kbd> pause
+  </div>
+</main>
+```
+
+Kbd arrows: use ▲▼◀▶ glyphs for compactness.
+
+Z-index: blobs 0, cabinet 2, motes 1… motes behind cabinet but visible around edges. Body overflow-x hidden; motes fixed within vh.
+
+Mote animation translateY -46vh may go above viewport; fine.
+
+Now let me finalize doTick queue logic. Potential subtlety: queue holds directions; while loop consumes entries that are reverse (discard) until valid found. If queue entry equals current dir, discard (no-op). Then set dir and break. Good.
+
+pushDir ignores reverse immediately — but with chain turns, e.g. dir right, press up then left quickly: queue [up,left]. Tick 1: dir=up. Tick 2: left valid vs up → OK. Good.
+
+Also ensure prevSnake updated before kill? On kill we don't need prev. Fine.
+
+Also on growth, prevSnake is old array (length n), snake length n+1; render uses prevSnake[i]||cur for i=n → cur (tail stationary). Tail segment (new one) is at old tail position, stationary — correct since it doesn't move on growth tick.
+
+Wait: on growth, snake.unshift(head) without pop → length n+1. Segment indexing: snake[n] = old tail (didn't move). prevSnake[n] undefined → use cur → stationary. ✓. Other segments i: prevSnake[i] is old position of segment i; snake[i] = old segment i-1 position… hmm let me verify: old snake = [s0..s_{n-1}]. After unshift: new = [head, s0..s_{n-1}]. Segment i (0-indexed in new array) corresponds to… for interpolation we treat each array index as a point moving from prevSnake[i] to snake[i]. prevSnake[i] = s_i (old). snake[i] = s_{i-1} for i>=1, head for i=0. So point i moves from s_i to s_{i-1} — body sliding forward ✓. For i=n: prevSnake[n] undefined → cur = s_{n-1}, stationary ✓.
+
+Without growth + pop: new = [head, s0..s_{n-2}], length n. i=n-1: prevSnake[n-1]=s_{n-1}, snake[n-1]=s_{n-2} → tail slides forward ✓.
+
+Great.
+
+HUD speed display: '×'+(level+1). At score 0 → ×1.
+
+Also add small "points to next speed" indicator? Maybe overkill. Skip.
+
+Now let me generate the final code block. Ensure no stray backticks. Use standard script.
+
+Also one more polish: on eat, brief brightness flash on stage? Burst covers.
+
+Also on ready overlay, animate the key prompt blinking: .ov-prompt span.key animation blink 1.4s infinite. Add.
+
+Pause overlay also uses same showOverlay.
+
+Also confirm `start()` with no override from Space: resetGame(true) state playing, hideOverlay.
+
+Also initial best display: updateHUD called in resetGame; best from LS.
+
+Potential issue: `el.score.classList` bump uses void reflow trick — fine.
+
+Font stack for canvas text: 'ui-monospace, "Courier New", monospace'.
+
+Now let me write it all out. Also add meta theme-color for niceness.
+
+Let me count z-index and ensure banner above overlay? Banner z 6, overlay z 5 — banner during play (no overlay) fine; on speed up while playing, overlay hidden. OK.
+
+Edge: speed up banner fires during play; overlay hidden. ✓
+
+Also confirm keydown Space when state==='paused' → nothing (only restart on ready/dead/win). P/Esc resumes. Fine.
+
+Also Escape when ready? Nothing. Fine.
+
+Final check on requirement "speed increases slightly every 5 points": with decay 0.92 per 5 points: tick 150→138→123→113→103→95→… approaching min 62. That's "slightly" increasing speed each 5 points ✓.
+
+Let me write the file.
+
+Also for safety, wrap localStorage in try/catch both reads and writes.
+
+CSS: ensure `.overlay` hidden by default? We set via JS immediately on load; but before JS runs, overlay is empty anyway. Fine.
+
+Also add `user-select:none` on cabinet to avoid text selection on rapid clicks.
+
+Also touch support? Not required; skip (could add swipe but not asked). Keep scope tight but polished.
+
+Let me write the final answer: single html code block only, with no extra prose (user said "Output only the file contents in a single ```html code block"). So respond with just the code block.
+
+Now let me write the complete code, checking syntax mentally.
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#04121a" />
+<title>SNAKE · Arcade</title>
+<style>
+  :root{
+    --bg0:#04121a;
+    --bg1:#0a2230;
+    --panel-a:#102836;
+    --panel-b:#0a1d27;
+    --line:rgba(126,242,154,.14);
+    --text:#e9f6ee;
+    --dim:#8fb4a5;
+    --amber:#ffb703;
+    --coral:#ff5d5d;
+    --green:#7ef29a;
+    --mono:ui-monospace,"Courier New",monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px 12px;
+    background:
+      radial-gradient(1100px 620px at 12% -12%, rgba(22,92,104,.55), transparent 62%),
+      radial-gradient(900px 520px at 108% 112%, rgba(255,183,3,.10), transparent 60%),
+      linear-gradient(180deg,var(--bg1),var(--bg0));
+    background-attachment:fixed;
+    color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    overflow-x:hidden;
+  }
+  body::before{ /* scanlines */
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:3;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px);
+    opacity:.35;
+  }
+  ...
+```
+
+Wait, body::before z-index 3 above cabinet (z 2) would darken cabinet slightly — actually a CRT scanline over everything is a cohesive effect; opacity .35 might be too strong over text. Reduce to .22. OK.
+
+Blobs:
+
+```css
+.blob{position:fixed;border-radius:50%;pointer-events:none;z-index:0;filter:blur(10px);}
+.b1{width:420px;height:420px;left:-120px;top:-140px;background:radial-gradient(circle,rgba(20,120,110,.35),transparent 70%);animation:drift1 22s ease-in-out infinite alternate;}
+.b2{width:380px;height:380px;right:-120px;bottom:-140px;background:radial-gradient(circle,rgba(255,170,40,.16),transparent 70%);animation:drift2 26s ease-in-out infinite alternate;}
+@keyframes drift1{to{transform:translate(60px,40px) scale(1.08);}}
+@keyframes drift2{to{transform:translate(-50px,-50px) scale(1.1);}}
+```
+
+Cabinet etc. as planned.
+
+Motes z-index 1.
+
+Now let me write the JS in full, in final form, double-checking.
+
+Also: `const DIRS` uses e.code strings like 'ArrowUp'. ✓
+
+Also preventDefault for Space to stop page scroll — ✓. Also preventDefault for arrows.
+
+Also ensure that when overlay shown (ready), render still animates food pulse and tongue — tongue only when playing; food pulse always. Lively preview ✓.
+
+Also floaters/particles on ready none.
+
+Final: initial call:
+
+```js
+resetGame(false);
+requestAnimationFrame(frame);
+```
+
+resetGame(false) calls showOverlay('ready').
+
+Also generate motes at end of script.
+
+Also `newBest` declared with let.
+
+Also confirm `stage` const defined: `const stage=document.getElementById('stage');`
+
+Also `el.banner`.
+
+Also floaters font uses var? Canvas can't use CSS vars; hardcode font string.
+
+OK, also one subtle bug: in doTick, after kill() return, prevSnake was already set — irrelevant.
+
+In doTick growing branch, we call updateHUD() every food (score/speed may change). Fine.
+
+Also confirm speed display updates only on level change — updateHUD inside level-change block; but score text needs update every food. Let me call el.score.textContent=score directly in growing branch, and updateHUD on level change. Simpler: call updateHUD() every food; cheap.
+
+Let me write it.
+
+Also add `aria-live` for score? Nice a11y touch: aria-live="polite" on score. Add role="status". Minor.
+
+Also canvas aria-label describing game.
+
+Final file — let me write it out. Also keep the hint line wrapping on mobile.
+
+Also .hint kbd style.
+
+Also .marquee .sub align.
+
+Also ensure `.overlay` uses padding and gap; content may overflow on small heights — allow overflow auto? Fine.
+
+Also add media query for very small screens: reduce cabinet padding, hud gap, stat min-width.
+
+@media (max-width:480px){ .cabinet{width:100%;padding:12px} .stat{min-width:70px;padding:6px 10px} .stat span{font-size:18px} }
+
+OK, writing final.
+
+One more: `.stage` aspect via canvas style: `canvas{width:100%;height:auto;display:block;}` canvas has intrinsic ratio from width/height attributes → auto height keeps square ✓.
+
+Banner initial opacity 0 ✓.
+
+Also add slight border on canvas stage? Already box-shadow.
+
+Also add focus outline? No inputs; fine.
+
+Now generate the answer: single html code block, nothing else.
+
+Let me write the code carefully in full.
+
+Also double-check keydown: e.code 'Space' — also preventDefault to avoid page scroll. ✓
+
+Also on start via arrow during 'dead', start(d) resets and sets dir — good.
+
+Also during 'win', arrow restarts ✓.
+
+Also during 'paused', arrow key: state paused → d branch does nothing (only ready/dead/win/playing). Should arrow resume and steer? Minor; leave.
+
+Also during 'ready', queue input? start(d) handles initial direction; additional keys during ready will call start again — each arrow restarts; harmless but resets food. Acceptable; but better: if state ready and arrow pressed → start(d) once; subsequent presses… will restart again. To avoid annoyance, after start state becomes playing so fine.
+
+Edge: hold arrow — keydown repeat triggers start repeatedly only while ready; after first start, state playing, repeats pushDir — fine.
+
+pushDir during rapid repeat: same direction ignored ✓.
+
+Now let me write it all out. Also add small "grid coordinates" nothing. Done.
+
+Also let me re-verify hsl string: `hsl(${hue},${sat}%,${light}%)` — valid comma syntax ✓.
+
+Also ctx.ellipse not needed.
+
+Also on death, tongue hidden since state!=='playing' ✓.
+
+Also drawFood when food undefined? spawnFood always called before render ✓ (resetGame calls spawnFood).
+
+win(): overlay content:
+
+```js
+html = `<div class="ov-title">YOU WIN!</div>
+ <div class="final"><span class="lbl">FULL BOARD</span><span>${score}</span></div>
+ <div class="newbest">★ PERFECT RUN ★</div>
+ <div class="ov-prompt"><span class="key">SPACE</span> to play again</div>`;
+```
+
+paused:
+
+```html
+<div class="ov-title">PAUSED</div>
+<p class="ov-sub">Press <b>P</b> or <b>Esc</b> to resume</p>
+```
+
+OK. Composing final.
+
+Also stage boost keyframe: animate box-shadow:
+
+```css
+@keyframes boost{
+  0%{ box-shadow: inset 0 0 40px rgba(0,0,0,.5), 0 0 0 2px rgba(255,183,3,.95), 0 0 38px rgba(255,183,3,.6); }
+  100%{ box-shadow: inset 0 0 40px rgba(0,0,0,.5), 0 0 0 1px rgba(126,242,154,.10); }
+}
+.stage.boost{ animation:boost .7s ease; }
+```
+
+Base .stage box-shadow defined; animation overrides during play.
+
+Shake transform conflicts with boost? Not simultaneous. Fine.
+
+Also .stage.shake transform — stage has no other transform. ✓
+
+Also entrance animation on cabinet:
+
+```css
+.cabinet{ animation:rise .7s cubic-bezier(.2,.7,.3,1) both; }
+@keyframes rise{ from{opacity:0;transform:translateY(20px) scale(.98);} }
+```
+
+Motes keyframes with per-element duration/delay set inline.
+
+.mote base: width/height set per nth-child? Use inline JS style for random size. In JS: m.style.width=m.style.height=(3+Math.random()*4)+'px'. Color variation: alternate classes.
+
+```css
+.mote{...background:radial-gradient(circle at 35% 35%, rgba(255,255,255,.85), rgba(126,242,154,.35) 45%, transparent 70%);}
+.mote.warm{background:radial-gradient(circle at 35% 35%, rgba(255,255,255,.85), rgba(255,183,3,.4) 45%, transparent 70%);}
+```
+
+Animation:
+
+```css
+@keyframes moteFloat{
+  0%{transform:translateY(0);opacity:0;}
+  12%{opacity:.75;}
+  80%{opacity:.45;}
+  100%{transform:translateY(-52vh);opacity:0;}
+}
+.mote{animation-name:moteFloat; animation-timing-function:linear; animation-iteration-count:infinite;}
+```
+
+JS sets animationDuration/Delay inline.
+
+OK — final composition. Also don't forget `user-select:none` on cabinet and `touch-action` default fine.
+
+Let me count HUD ids used in JS: score, best, speed, overlay, stage, banner ✓ all present.
+
+Writing the answer now. Ensure the code block contains the complete file and nothing else outside it.
+</think>
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#04121a" />
+<title>SNAKE · Arcade</title>
+<style>
+  :root{
+    --bg0:#04121a;
+    --bg1:#0a2230;
+    --line:rgba(126,242,154,.14);
+    --text:#e9f6ee;
+    --dim:#8fb4a5;
+    --amber:#ffb703;
+    --coral:#ff5d5d;
+    --green:#7ef29a;
+    --mono:ui-monospace,"Courier New",monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px 12px;
+    background:
+      radial-gradient(1100px 620px at 12% -12%, rgba(22,92,104,.55), transparent 62%),
+      radial-gradient(900px 520px at 108% 112%, rgba(255,183,3,.10), transparent 60%),
+      linear-gradient(180deg,var(--bg1),var(--bg0));
+    background-attachment:fixed;
+    color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    overflow-x:hidden;
+  }
+  /* CRT scanlines over the whole scene */
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:3;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px);
+    opacity:.22;
+  }
+  /* ambient drifting glows */
+  .blob{position:fixed;border-radius:50%;pointer-events:none;z-index:0;filter:blur(8px);}
+  .b1{width:430px;height:430px;left:-130px;top:-150px;
+      background:radial-gradient(circle,rgba(20,120,110,.35),transparent 70%);
+      animation:drift1 22s ease-in-out infinite alternate;}
+  .b2{width:390px;height:390px;right:-130px;bottom:-150px;
+      background:radial-gradient(circle,rgba(255,170,40,.16),transparent 70%);
+      animation:drift2 27s ease-in-out infinite alternate;}
+  @keyframes drift1{to{transform:translate(60px,42px) scale(1.08);}}
+  @keyframes drift2{to{transform:translate(-55px,-55px) scale(1.1);}}
+
+  /* floating dust */
+  .mote{
+    position:fixed;border-radius:50%;pointer-events:none;z-index:1;opacity:0;
+    background:radial-gradient(circle at 35% 35%,rgba(255,255,255,.85),rgba(126,242,154,.35) 45%,transparent 70%);
+    animation-name:moteFloat;animation-timing-function:linear;animation-iteration-count:infinite;
+  }
+  .mote.warm{background:radial-gradient(circle at 35% 35%,rgba(255,255,255,.85),rgba(255,183,3,.42) 45%,transparent 70%);}
+  @keyframes moteFloat{
+    0%{transform:translateY(0);opacity:0;}
+    12%{opacity:.75;}
+    80%{opacity:.4;}
+    100%{transform:translateY(-52vh);opacity:0;}
+  }
+
+  /* cabinet */
+  .cabinet{
+    position:relative;z-index:2;
+    width:min(94vw,560px);
+    background:linear-gradient(180deg,#102836,#0a1d27);
+    border:1px solid var(--line);
+    border-radius:22px;
+    padding:18px 18px 14px;
+    box-shadow:0 30px 60px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.06);
+    user-select:none;
+    animation:rise .7s cubic-bezier(.2,.7,.3,1) both;
+  }
+  @keyframes rise{from{opacity:0;transform:translateY(20px) scale(.98);}}
+
+  /* marquee */
+  .marquee{
+    display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+    background:linear-gradient(180deg,#ffc63d,#ff9d00);
+    border-radius:12px;padding:10px 16px;margin-bottom:14px;
+    box-shadow:inset 0 2px 0 rgba(255,255,255,.35), 0 6px 16px rgba(255,157,0,.25);
+  }
+  .marquee h1{
+    margin:0;
+    font-family:var(--mono);
+    font-size:clamp(28px,6vw,40px);
+    letter-spacing:.12em;
+    font-weight:800;
+    color:#221500;
+    text-shadow:0 1px 0 rgba(255,255,255,.28);
+  }
+  .marquee .sub{
+    font-family:var(--mono);font-size:11px;letter-spacing:.42em;color:#5c3d00;align-self:center;
+  }
+
+  /* HUD */
+  .hud{display:flex;justify-content:space-between;gap:8px;margin-bottom:12px;}
+  .stat{
+    background:#0a1c26;border:1px solid var(--line);border-radius:12px;
+    padding:8px 14px;min-width:98px;text-align:center;
+  }
+  .stat label{display:block;font-size:10px;letter-spacing:.32em;color:var(--dim);font-weight:700;}
+  .stat span{display:block;font-family:var(--mono);font-size:22px;font-weight:700;color:var(--green);line-height:1.15;}
+  #score{color:var(--amber);}
+  #speed{color:#9fd8ff;}
+  .bump{animation:bump .35s ease;}
+  @keyframes bump{0%{transform:scale(1)}40%{transform:scale(1.35)}100%{transform:scale(1)}}
+
+  /* stage */
+  .stage{
+    position:relative;
+    border-radius:16px;
+    background:#081f18;
+    box-shadow:inset 0 0 40px rgba(0,0,0,.5), 0 0 0 1px rgba(126,242,154,.10);
+    overflow:hidden;
+  }
+  .stage::before{content:"";position:absolute;inset:0;pointer-events:none;
+    box-shadow:inset 0 0 80px rgba(0,0,0,.45);}
+  .stage::after{content:"";position:absolute;inset:0;pointer-events:none;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,.13) 0 1px,transparent 1px 3px);
+    opacity:.5;}
+  canvas{display:block;width:100%;height:auto;}
+
+  .stage.shake{animation:shake .45s cubic-bezier(.36,.07,.19,.97);}
+  @keyframes shake{
+    0%,100%{transform:translate(0,0);}
+    10%{transform:translate(-9px,4px);}
+    20%{transform:translate(8px,-5px);}
+    30%{transform:translate(-7px,-3px);}
+    40%{transform:translate(6px,4px);}
+    50%{transform:translate(-4px,2px);}
+    60%{transform:translate(3px,-2px);}
+    70%{transform:translate(-2px,1px);}
+  }
+  .stage.boost{animation:boost .7s ease;}
+  @keyframes boost{
+    0%{box-shadow:inset 0 0 40px rgba(0,0,0,.5),0 0 0 2px rgba(255,183,3,.95),0 0 38px rgba(255,183,3,.6);}
+    100%{box-shadow:inset 0 0 40px rgba(0,0,0,.5),0 0 0 1px rgba(126,242,154,.10);}
+  }
+
+  /* speed banner */
+  .banner{
+    position:absolute;top:34%;left:50%;transform:translate(-50%,-50%);
+    z-index:6;opacity:0;pointer-events:none;white-space:nowrap;
+    font-family:var(--mono);font-weight:800;letter-spacing:.35em;
+    font-size:clamp(18px,4vw,26px);color:#221500;
+    background:linear-gradient(180deg,#ffd166,#ffab00);
+    padding:10px 26px;border-radius:10px;
+    box-shadow:0 0 30px rgba(255,171,0,.55);
+  }
+  .banner.show{animation:bannerPop .9s ease forwards;}
+  @keyframes bannerPop{
+    0%{opacity:0;transform:translate(-50%,-50%) scale(.6);}
+    15%{opacity:1;transform:translate(-50%,-50%) scale(1.08);}
+    25%{transform:translate(-50%,-50%) scale(1);}
+    75%{opacity:1;}
+    100%{opacity:0;transform:translate(-50%,-62%) scale(1);}
+  }
+
+  /* overlay */
+  .overlay{
+    position:absolute;inset:0;z-index:5;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:14px;text-align:center;padding:22px;
+    background:rgba(4,14,12,.84);
+    backdrop-filter:blur(3px);
+    transition:opacity .25s ease;
+  }
+  .overlay.hidden{opacity:0;pointer-events:none;}
+  .ov-title{
+    margin:0;font-family:var(--mono);font-weight:800;
+    font-size:clamp(30px,7vw,46px);letter-spacing:.14em;color:var(--green);
+    text-shadow:0 0 24px rgba(126,242,154,.35);
+  }
+  .ov-title-bad{color:var(--coral);text-shadow:0 0 24px rgba(255,93,93,.45);}
+  .ov-sub{margin:0;color:var(--dim);font-size:14px;line-height:1.8;}
+  .ov-sub b{color:var(--text);}
+  .final{display:flex;flex-direction:column;gap:4px;margin-top:8px;}
+  .final .lbl{font-size:10px;letter-spacing:.35em;color:var(--dim);}
+  .final span:last-child{font-family:var(--mono);font-size:34px;font-weight:700;color:var(--amber);}
+  .newbest{
+    font-family:var(--mono);font-size:12px;letter-spacing:.3em;color:var(--amber);
+    animation:bump 1s ease-in-out infinite;
+  }
+  .ov-prompt{margin-top:12px;font-size:13px;color:var(--dim);letter-spacing:.12em;}
+  .key{
+    display:inline-block;padding:4px 10px;border-radius:8px;
+    border:1px solid var(--line);border-bottom-width:3px;background:#0d2530;
+    font-family:var(--mono);font-size:11px;letter-spacing:.25em;color:var(--green);
+    animation:blink 1.4s ease-in-out infinite;
+  }
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+
+  /* hint */
+  .hint{
+    margin-top:12px;text-align:center;font-size:12px;color:var(--dim);letter-spacing:.06em;line-height:2;
+  }
+  kbd{
+    font-family:var(--mono);font-size:11px;color:var(--text);
+    background:#0d2530;border:1px solid var(--line);border-bottom-width:2px;
+    border-radius:6px;padding:1px 6px;
+  }
+
+  @media (max-width:480px){
+    .cabinet{width:100%;padding:12px 12px 10px;}
+    .stat{min-width:72px;padding:6px 10px;}
+    .stat span{font-size:18px;}
+    .hint{font-size:11px;}
+  }
+</style>
+</head>
+<body>
+
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+
+  <main class="cabinet">
+    <div class="marquee">
+      <h1>SNAKE</h1>
+      <span class="sub">ARCADE</span>
+    </div>
+
+    <div class="hud">
+      <div class="stat"><label for="score">SCORE</label><span id="score" role="status" aria-live="polite">0</span></div>
+      <div class="stat"><label for="best">BEST</label><span id="best">0</span></div>
+      <div class="stat"><label for="speed">SPEED</label><span id="speed">&times;1</span></div>
+    </div>
+
+    <div class="stage" id="stage">
+      <canvas id="game" width="480" height="480" aria-label="Snake game board, 20 by 20 grid"></canvas>
+      <div class="banner" id="banner"></div>
+      <div class="overlay" id="overlay"></div>
+    </div>
+
+    <div class="hint">
+      Move: <kbd>&uarr;</kbd><kbd>&darr;</kbd><kbd>&larr;</kbd><kbd>&rarr;</kbd> or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> &nbsp;&middot;&nbsp;
+      <kbd>Space</kbd> start / restart &nbsp;&middot;&nbsp; <kbd>P</kbd> pause
+    </div>
+  </main>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ---------- setup ---------- */
+  const GRID = 20;                 // 20x20 grid
+  const CELL = 24;                 // logical px per cell (480x480 board)
+  const BASE_MS = 150;             // start speed
+  const SPEED_DECAY = 0.92;        // slight speedup every 5 points
+  const MIN_MS = 62;
+
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const W = GRID * CELL, H = GRID * CELL;
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const stage   = document.getElementById('stage');
+  const banner  = document.getElementById('banner');
+  const overlay = document.getElementById('overlay');
+  const elScore = document.getElementById('score');
+  const elBest  = document.getElementById('best');
+  const elSpeed = document.getElementById('speed');
+
+  let best = 0;
+  try { best = parseInt(localStorage.getItem('snake-best') || '0', 10) || 0; } catch (e) {}
+
+  /* ---------- state ---------- */
+  let state = 'ready';             // ready | playing | paused | dead | win
+  let snake = [], prevSnake = [], dir = {x:1, y:0}, queue = [];
+  let food = null, score = 0, level = 0, tickMs = BASE_MS;
+  let acc = 0, last = performance.now();
+  let newBest = false;
+  let particles = [], floaters = [];
+
+  /* ---------- helpers ---------- */
+  function setState(s){ state = s; }
+
+  function updateHUD(){
+    elScore.textContent = score;
+    elBest.textContent  = best;
+    elSpeed.textContent = '\u00d7' + (level + 1);
+  }
+
+  function spawnFood(){
+    const occupied = new Set(snake.map(s => s.x + ',' + s.y));
+    const free = [];
+    for (let y = 0; y < GRID; y++)
+      for (let x = 0; x < GRID; x++)
+        if (!occupied.has(x + ',' + y)) free.push({x, y});
+    if (!free.length){ win(); return; }
+    food = free[(Math.random() * free.length) | 0];
+  }
+
+  function showOverlay(kind){
+    let html = '';
+    if (kind === 'ready'){
+      html =
+        '<div class="ov-title">SNAKE</div>' +
+        '<p class="ov-sub">Steer with the <b>arrow keys</b> or <b>WASD</b>.</p>' +
+        '<p class="ov-sub">Eat the coral dots &mdash; the snake grows. Speed rises every <b>5 points</b>.</p>' +
+        '<div class="ov-prompt"><span class="key">SPACE</span> to start</div>';
+    } else if (kind === 'dead'){
+      html =
+        '<div class="ov-title ov-title-bad">GAME OVER</div>' +
+        '<div class="final"><span class="lbl">FINAL SCORE</span><span>' + score + '</span></div>' +
+        (newBest ? '<div class="newbest">\u2605 NEW BEST \u2605</div>' : '') +
+        '<div class="ov-prompt"><span class="key">SPACE</span> to restart</div>';
+    } else if (kind === 'win'){
+      html =
+        '<div class="ov-title">YOU WIN!</div>' +
+        '<div class="final"><span class="lbl">FULL BOARD</span><span>' + score + '</span></div>' +
+        '<div class="newbest">\u2605 PERFECT RUN \u2605</div>' +
+        '<div class="ov-prompt"><span class="key">SPACE</span> to play again</div>';
+    } else if (kind === 'paused'){
+      html =
+        '<div class="ov-title">PAUSED</div>' +
+        '<p class="ov-sub">Press <b>P</b> or <b>Esc</b> to resume</p>';
+    }
+    overlay.innerHTML = html;
+    overlay.classList.remove('hidden');
+  }
+
+  function hideOverlay(){ overlay.classList.add('hidden'); }
+
+  function flashBanner(text){
+    banner.textContent = text;
+    banner.classList.remove('show');
+    void banner.offsetWidth;               // restart animation
+    banner.classList.add('show');
+  }
+
+  function pushDir(d){
+    if (d.x === dir.x && d.y === dir.y) return;
+    if (d.x === -dir.x && d.y === -dir.y) return;
+    if (queue.length < 3) queue.push(d);
+  }
+
+  /* ---------- game flow ---------- */
+  function resetGame(running){
+    snake = [{x:9,y:10},{x:8,y:10},{x:7,y:10}];
+    prevSnake = snake.map(o => ({...o}));
+    dir = {x:1, y:0};
+    queue = [];
+    score = 0; level = 0; tickMs = BASE_MS; acc = 0;
+    newBest = false;
+    particles = []; floaters = [];
+    spawnFood();
+    updateHUD();
+    setState(running ? 'playing' : 'ready');
+    if (!running) showOverlay('ready');
+  }
+
+  function start(dirOverride){
+    resetGame(true);
+    if (dirOverride && !(dirOverride.x === -dir.x && dirOverride.y === -dir.y)) dir = dirOverride;
+    hideOverlay();
+  }
+
+  function doTick(){
+    // consume input queue
+    while (queue.length){
+      const d = queue[0];
+      if (d.x === -dir.x && d.y === -dir.y){ queue.shift(); continue; }
+      if (d.x === dir.x && d.y === dir.y){ queue.shift(); continue; }
+      dir = d; queue.shift(); break;
+    }
+
+    prevSnake = snake.map(s => ({...s}));
+    const head = {x: snake[0].x + dir.x, y: snake[0].y + dir.y};
+
+    // wall collision -> game over
+    if (head.x < 0 || head.y < 0 || head.x >= GRID || head.y >= GRID){ kill(); return; }
+
+    const growing = head.x === food.x && head.y === food.y;
+    const bodyToCheck = growing ? snake : snake.slice(0, -1);
+    for (const s of bodyToCheck){
+      if (s.x === head.x && s.y === head.y){ kill(); return; }
+    }
+
+    snake.unshift(head);
+
+    if (growing){
+      score += 1;
+      const newLevel = Math.floor(score / 5);      // speed up every 5 points
+      if (newLevel !== level){
+        level = newLevel;
+        tickMs = Math.max(MIN_MS, BASE_MS * Math.pow(SPEED_DECAY, level));
+        flashBanner('SPEED UP!');
+        stage.classList.remove('boost'); void stage.offsetWidth; stage.classList.add('boost');
+        updateHUD();
+      }
+      spawnFood();
+      burstPx((food.x + 0.5) * CELL, (food.y + 0.5) * CELL, '#ff5d5d', 14);
+      floaters.push({text:'+1', x:(food.x + 0.5) * CELL, y:food.y * CELL, life:1});
+      elScore.classList.remove('bump'); void elScore.offsetWidth; elScore.classList.add('bump');
+      updateHUD();
+    } else {
+      snake.pop();
+    }
+  }
+
+  function kill(){
+    setState('dead');
+    const isRecord = score > best;
+    if (isRecord){
+      best = score; newBest = true;
+      try { localStorage.setItem('snake-best', String(best)); } catch (e) {}
+    } else {
+      newBest = false;
+    }
+    burstPx((snake[0].x + 0.5) * CELL, (snake[0].y + 0.5) * CELL, '#7ef29a', 26);
+    stage.classList.remove('shake'); void stage.offsetWidth; stage.classList.add('shake');
+    updateHUD();
+    showOverlay('dead');
+  }
+
+  function win(){
+    setState('win');
+    updateHUD();
+    showOverlay('win');
+  }
+
+  function pause(){
+    if (state !== 'playing') return;
+    setState('paused'); acc = 0;
+    showOverlay('paused');
+  }
+
+  function resume(){
+    if (state !== 'paused') return;
+    setState('playing'); hideOverlay();
+  }
+
+  /* ---------- effects ---------- */
+  function burstPx(px, py, color, n){
+    for (let i = 0; i < n; i++){
+      const a = Math.random() * Math.PI * 2;
+      const sp = 2 + Math.random() * 5;
+      particles.push({
+        x:px, y:py,
+        vx:Math.cos(a) * sp,
+        vy:Math.sin(a) * sp - 1.5,
+        life:1, color,
+        size:1.8 + Math.random() * 2.6
+      });
+    }
+  }
+
+  function updateFx(dt){
+    for (let i = particles.length - 1; i >= 0; i--){
+      const p = particles[i];
+      p.life -= dt / 650;
+      if (p.life <= 0){ particles.splice(i, 1); continue; }
+      p.vy += dt * 0.004;
+      p.vx *= (1 - dt * 0.0008);
+      p.x += p.vx * dt / 16;
+      p.y += p.vy * dt / 16;
+    }
+    for (let i = floaters.length - 1; i >= 0; i--){
+      floaters[i].life -= dt / 900;
+      if (floaters[i].life <= 0) floaters.splice(i, 1);
+    }
+  }
+
+  function drawFx(){
+    for (const p of particles){
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+    }
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'center';
+    ctx.font = '700 15px ' + getComputedStyle(document.body).getPropertyValue('--mono');
+    ctx.font = ctx.font.replace(/[\s"']/g, '') || '700 15px ui-monospace,monospace';
+    for (const f of floaters){
+      ctx.globalAlpha = Math.max(0, f.life);
+      ctx.fillStyle = '#ffd166';
+      ctx.fillText(f.text, f.x, f.y - (1 - f.life) * 30);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /* ---------- rendering ---------- */
+  function render(alpha, time){
+    // board + checker
+    ctx.fillStyle = '#0a241c';
+    ctx.fillRect(0, 0, W, H);
+    for (let y = 0; y < GRID; y++)
+      for (let x = 0; x < GRID; x++)
+        if ((x + y) % 2 === 0){ ctx.fillStyle = 'rgba(255,255,255,.028)'; ctx.fillRect(x * CELL, y * CELL, CELL, CELL); }
+
+    // grid lines
+    ctx.strokeStyle = 'rgba(126,242,154,.05)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 1; i < GRID; i++){
+      ctx.moveTo(i * CELL + .5, 0); ctx.lineTo(i * CELL + .5, H);
+      ctx.moveTo(0, i * CELL + .5); ctx.lineTo(W, i * CELL + .5);
+    }
+    ctx.stroke();
+
+    drawFood(time);
+    drawSnake(alpha, time);
+    drawFx();
+  }
+
+  function drawFood(time){
+    const cx = (food.x + 0.5) * CELL, cy = (food.y + 0.5) * CELL;
+    const pulse = Math.sin(time * 0.0045) * 0.5 + 0.5;
+    const r = CELL * (0.28 + pulse * 0.055);
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,93,93,' + (0.25 + pulse * 0.2).toFixed(3) + ')';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, CELL * 0.46 + pulse * 3, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(255,93,93,.95)';
+    ctx.shadowBlur = 16 + pulse * 10;
+    ctx.fillStyle = '#ff5d5d';
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(cx - r * 0.32, cy - r * 0.32, r * 0.34, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawSnake(alpha, time){
+    const pts = [];
+    for (let i = 0; i < snake.length; i++){
+      const cur = snake[i], prev = prevSnake[i] || cur;
+      pts.push({
+        x: (prev.x + (cur.x - prev.x) * alpha + 0.5) * CELL,
+        y: (prev.y + (cur.y - prev.y) * alpha + 0.5) * CELL
+      });
+    }
+    const n = pts.length;
+
+    // body: tail -> head so head sits on top, hue shifting green -> deep teal
+    for (let i = n - 1; i >= 0; i--){
+      const t = n > 1 ? i / (n - 1) : 0;
+      const hue = 150 - t * 22;
+      const sat = 65 + t * 15;
+      const light = 60 - t * 18;
+      const r = CELL * (0.40 - t * 0.07);
+      ctx.fillStyle = 'hsl(' + hue + ',' + sat + '%,' + light + '%)';
+      ctx.beginPath(); ctx.arc(pts[i].x, pts[i].y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(6,20,14,.35)'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,.10)';
+      ctx.beginPath(); ctx.arc(pts[i].x - r * 0.3, pts[i].y - r * 0.3, r * 0.35, 0, Math.PI * 2); ctx.fill();
+    }
+
+    const a0 = pts[0], a1 = pts[1] || pts[0];
+    const ang = Math.atan2(a1.y - a0.y, a1.x - a0.x);
+    const fx = Math.cos(ang), fy = Math.sin(ang);
+    const ex = -fy, ey = fx;
+    const mx = a0.x + fx * CELL * 0.42, my = a0.y + fy * CELL * 0.42;
+
+    // tongue flick (occasionally)
+    if (state === 'playing' && (time % 1700) < 220){
+      const len = CELL * 0.14 * (0.6 + 0.4 * Math.sin(time * 0.06));
+      const tipX = mx + fx * len, tipY = my + fy * len;
+      ctx.strokeStyle = '#ff5d5d'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(tipX, tipY); ctx.stroke();
+      const bx = tipX + fx * len * 0.35, by = tipY + fy * len * 0.35;
+      ctx.beginPath();
+      ctx.moveTo(tipX, tipY); ctx.lineTo(bx + ex * len * 0.9, by + ey * len * 0.9);
+      ctx.moveTo(tipX, tipY); ctx.lineTo(bx - ex * len * 0.9, by - ey * len * 0.9);
+      ctx.stroke();
+    }
+
+    // eyes
+    const off = CELL * 0.17, fwd = CELL * 0.14;
+    for (const s of [-1, 1]){
+      const cx = a0.x + fx * fwd + ex * off * s;
+      const cy = a0.y + fy * fwd + ey * off * s;
+      ctx.fillStyle = '#081712';
+      ctx.beginPath(); ctx.arc(cx, cy, 2.9, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#eafff2';
+      ctx.beginPath(); ctx.arc(cx - fx * 1.1, cy - fy * 1.1, 1.6, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  /* ---------- loop ---------- */
+  function frame(now){
+    const dt = Math.min(now - last, 100);
+    last = now;
+
+    if (state === 'playing'){
+      acc += dt;
+      let guard = 0;
+      while (acc >= tickMs && state === 'playing' && guard++ < 4){
+        acc -= tickMs;
+        doTick();
+      }
+    } else {
+      acc = 0;
+    }
+
+    const alpha = state === 'playing' ? Math.min(acc / tickMs, 1) : 0;
+    render(alpha, now);
+    updateFx(dt);
+
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- input ---------- */
+  const DIRS = {
+    ArrowUp:{x:0,y:-1}, ArrowDown:{x:0,y:1},
+    ArrowLeft:{x:-1,y:0}, ArrowRight:{x:1,y:0},
+    KeyW:{x:0,y:-1}, KeyS:{x:0,y:1},
+    KeyA:{x:-1,y:0}, KeyD:{x:1,y:0}
+  };
+
+  window.addEventListener('keydown', e => {
+    const d = DIRS[e.code];
+    if (d){
+      e.preventDefault();
+      if (state === 'ready' || state === 'dead' || state === 'win') start(d);
+      else if (state === 'playing') pushDir(d);
+      return;
+    }
+    if (e.code === 'Space'){
+      e.preventDefault();
+      if (state === 'ready' || state === 'dead' || state === 'win') start();
+      return;
+    }
+    if (e.code === 'KeyP' || e.code === 'Escape'){
+      if (state === 'playing') pause();
+      else if (state === 'paused') resume();
+    }
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && state === 'playing') pause();
+  });
+
+  /* ---------- ambient dust ---------- */
+  for (let i = 0; i < 14; i++){
+    const m = document.createElement('i');
+    m.className = 'mote' + (i % 2 ? '' : ' warm');
+    const sz = 3 + Math.random() * 4;
+    m.style.left = Math.random() * 100 + '%';
+    m.style.top = Math.random() * 100 + '%';
+    m.style.width = m.style.height = sz + 'px';
+    m.style.animationDuration = (9 + Math.random() * 11) + 's';
+    m.style.animationDelay = (-Math.random() * 14) + 's';
+    document.body.appendChild(m);
+  }
+
+  /* ---------- go ---------- */
+  resetGame(false);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
+```

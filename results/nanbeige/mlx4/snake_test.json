@@ -1,0 +1,108 @@
+{
+ "ready": {
+  "state": "ready",
+  "len": 4,
+  "score": 0
+ },
+ "after_space": {
+  "state": "playing",
+  "head": {
+   "x": 12,
+   "y": 10
+  }
+ },
+ "moves": true,
+ "move_detail": {
+  "from": {
+   "x": 12,
+   "y": 10
+  },
+  "to": {
+   "x": 15,
+   "y": 10
+  }
+ },
+ "eat": [
+  {
+   "score": 1,
+   "len": 5,
+   "dom_score": "1"
+  },
+  {
+   "score": 2,
+   "len": 6,
+   "dom_score": "2"
+  },
+  {
+   "score": 3,
+   "len": 7,
+   "dom_score": "3"
+  },
+  {
+   "score": 4,
+   "len": 8,
+   "dom_score": "4"
+  },
+  {
+   "score": 5,
+   "len": 9,
+   "dom_score": "5"
+  },
+  {
+   "score": 6,
+   "len": 10,
+   "dom_score": "6"
+  }
+ ],
+ "eat_state": "playing",
+ "self_setup": {
+  "head": {
+   "x": 2,
+   "y": 15
+  },
+  "dir": {
+   "x": 0,
+   "y": 1
+  },
+  "len": 10,
+  "turns": [
+   {
+    "x": 1,
+    "y": 0
+   },
+   {
+    "x": 0,
+    "y": -1
+   },
+   {
+    "x": -1,
+    "y": 0
+   }
+  ]
+ },
+ "self_collision": {
+  "state": "over",
+  "overlay": "GAME OVER You hit yourself SCORE 6 \u2726 NEW BEST!",
+  "score": 6
+ },
+ "restart": {
+  "state": "playing",
+  "score": 0,
+  "dom_score": "0",
+  "len": 4
+ },
+ "wall": {
+  "state": "over",
+  "head": {
+   "x": 19,
+   "y": 10
+  },
+  "overlay": "GAME OVER You hit the wall SCORE 0"
+ },
+ "restart2": {
+  "state": "playing",
+  "score": 0,
+  "len": 4
+ },
+ "errors": []
+}

@@ -1,0 +1,8 @@
+{
+ "repo": "fcmeyer/Nanbeige4.3-33B-MLX-4bit",
+ "load_s": 3.5,
+ "mlx": "0.32.4",
+ "macos": "15.6.1",
+ "chip": "Apple M4 Max",
+ "mem_bytes": 137438953472
+}

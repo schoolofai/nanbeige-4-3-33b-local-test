@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run on Niladri's MacBook Pro. Installs only into ~/proai-tmp/nanbeige/.venv (no global changes, nothing uninstalled).
+# Runs on an Apple silicon Mac. Installs only into mac/.venv (no global changes, nothing uninstalled). The Snake test alone can take about an hour per build.
 set -u; cd "$(dirname "$0")"
 [ -d .venv ] || python3 -m venv .venv
 .venv/bin/pip -q install -U "mlx-lm" > install.log 2>&1; echo "INSTALL_EXIT $?" >> run.log

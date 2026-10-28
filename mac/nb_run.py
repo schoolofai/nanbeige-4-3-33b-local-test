@@ -30,5 +30,5 @@ run("speed", "Explain in about 300 words how a hash map works.", 600)
 run("t2_puzzle", (H.parent / "prompts" / "t2_puzzle.txt").read_text(), 8192)
 bug = (H.parent / "prompts" / "t3_bug.txt").read_text() + "\n\ncart.py:\n```python\n" + (H.parent / "bug_hunt" / "cart.py").read_text() + "```\n\ntest_cart.py:\n```python\n" + (H.parent / "bug_hunt" / "test_cart.py").read_text() + "```\nReply with the full fixed cart.py in one ```python code block, then the explanation."
 run("t3_bug", bug, 8192)
-run("t1_game", (H.parent / "prompts" / "t1_game.txt").read_text(), 16384)
+run("t1_game", (H.parent / "prompts" / "t1_game.txt").read_text(), 131072)
 print("TAG_DONE", tag, flush=True)
