@@ -1,6 +1,6 @@
 # Nanbeige4.3-33B on a Mac vs Claude Code and Codex
 
-Video: ProAI Clips on YouTube (link added after upload)
+Video: https://youtu.be/iv3w_SiQ-8Q
 
 Same three tests, same prompts, on the free open-weight Nanbeige4.3-33B (run locally with MLX on a MacBook Pro M4 Max, 128 GB, macOS 15) and on two frontier agents (Claude Code with Opus 5.5, Codex CLI with GPT-6.1 Sol).
 
